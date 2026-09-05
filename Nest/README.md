@@ -1,3 +1,35 @@
+# Nest
+
+## Page file map
+
+Each screen is intentionally bare so one teammate can build it without touching the others.
+
+| Page | File |
+| --- | --- |
+| Login | `src/app/login.tsx` |
+| Create / join a home | `src/app/create-join.tsx` |
+| Nest — center tab / announcements home | `src/app/(room)/index.tsx` |
+| Payments / what is owed | `src/app/(room)/payments.tsx` |
+| Chores | `src/app/(room)/chores.tsx` |
+| Groceries | `src/app/(room)/groceries.tsx` |
+| Documents and 4-digit PIN entry | `src/app/(room)/documents.tsx` |
+| Profile — outside the bottom tabs | `src/app/profile.tsx` |
+| Authenticated bottom-tab navigation | `src/app/(room)/_layout.tsx` |
+| App-level navigation | `src/app/_layout.tsx` |
+
+The app starts at `src/app/index.tsx`, which sends users to Login. Login leads to Create / Join, and that screen leads into the authenticated tab area. The tab order is Chores, Payments, Nest, Groceries, Documents. The top-right Profile button on Nest opens the standalone Profile page.
+
+## Run the app
+
+```bash
+npm install
+npm start
+```
+
+Scan the QR code with Expo Go. To test in a browser instead, press `w` after Expo starts.
+
+---
+
 # Welcome to your Expo app 👋
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
