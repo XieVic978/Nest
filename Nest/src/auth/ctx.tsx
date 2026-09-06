@@ -33,6 +33,8 @@ interface SessionContextValue {
   signInWithGoogle: () => Promise<AuthResult>;
   signOut: () => Promise<void>;
   updateProfile: (profile: UserProfile) => Promise<AuthResult>;
+  setDocumentPin: (pin: string) => Promise<VoidResult>;
+  verifyDocumentPin: (pin: string) => Promise<VoidResult>;
 }
 
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
@@ -113,11 +115,14 @@ export function SessionProvider({ children }: PropsWithChildren) {
     [user]
   );
 
+  const setDocumentPin = useCallback((pin: string) => authClient.setDocumentPin(pin), []);
+  const verifyDocumentPin = useCallback((pin: string) => authClient.verifyDocumentPin(pin), []);
+
   const value = useMemo<SessionContextValue>(
     () => ({
       isLoading,
       user,
-      hasCompletedProfile: user?.profile != null,
+      hasCompletedProfile: user?.profile != null && user.hasDocumentPin,
       signUp,
       signInWithPassword,
       verifyEmailCode,
@@ -127,6 +132,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
       signInWithGoogle,
       signOut,
       updateProfile,
+      setDocumentPin,
+      verifyDocumentPin,
     }),
     [
       isLoading,
@@ -140,6 +147,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
       signInWithGoogle,
       signOut,
       updateProfile,
+      setDocumentPin,
+      verifyDocumentPin,
     ]
   );
 

@@ -32,7 +32,7 @@ function requireClient() {
 
 // Build the app's User from an auth id/email + a (possibly missing) profile row.
 // A profile is considered complete once the full name is set.
-function toUser(id: string, email: string, row: ProfileRow | null): User {
+function toUser(id: string, email: string, row: ProfileRow | null, hasDocumentPin = false): User {
   const profile: UserProfile | null = row?.full_name
     ? {
         fullName: row.full_name,
@@ -41,7 +41,7 @@ function toUser(id: string, email: string, row: ProfileRow | null): User {
         ...(row.zelle ? { zelle: row.zelle } : {}),
       }
     : null;
-  return { id, email, profile };
+  return { id, email, profile, hasDocumentPin };
 }
 
 // Fetch the profile row for a user id, or null if none exists yet.
@@ -60,6 +60,15 @@ async function fetchProfile(userId: string): Promise<ProfileRow | null> {
     return null;
   }
   return (data as ProfileRow) ?? null;
+}
+
+async function fetchDocumentPinState(): Promise<boolean> {
+  const { data, error } = await requireClient().rpc("has_document_pin");
+  if (error) {
+    console.warn("[Nest] Could not read Documents PIN state:", error.message);
+    return false;
+  }
+  return data === true;
 }
 
 export const supabaseAuthClient: AuthClient = {
@@ -88,7 +97,7 @@ export const supabaseAuthClient: AuthClient = {
     const row = await fetchProfile(data.user.id);
     return {
       ok: true,
-      user: toUser(data.user.id, data.user.email ?? "", row),
+      user: toUser(data.user.id, data.user.email ?? "", row, await fetchDocumentPinState()),
     };
   },
 
@@ -103,7 +112,7 @@ export const supabaseAuthClient: AuthClient = {
       return { ok: false, error: error?.message ?? "That verification code isn't valid." };
     }
     const row = await fetchProfile(data.user.id);
-    return { ok: true, user: toUser(data.user.id, data.user.email ?? "", row) };
+    return { ok: true, user: toUser(data.user.id, data.user.email ?? "", row, await fetchDocumentPinState()) };
   },
 
   async resendVerificationCode(email): Promise<VoidResult> {
@@ -136,7 +145,7 @@ export const supabaseAuthClient: AuthClient = {
       return { ok: false, error: updateError?.message ?? "We couldn't update your password." };
     }
     const row = await fetchProfile(updated.user.id);
-    return { ok: true, user: toUser(updated.user.id, updated.user.email ?? "", row) };
+    return { ok: true, user: toUser(updated.user.id, updated.user.email ?? "", row, await fetchDocumentPinState()) };
   },
 
   async signInWithGoogle(): Promise<AuthResult> {
@@ -152,6 +161,17 @@ export const supabaseAuthClient: AuthClient = {
   async signOut(): Promise<void> {
     const client = requireClient();
     await client.auth.signOut();
+  },
+
+  async setDocumentPin(pin): Promise<VoidResult> {
+    const { error } = await requireClient().rpc("set_document_pin", { p_pin: pin });
+    return error ? { ok: false, error: error.message } : { ok: true };
+  },
+
+  async verifyDocumentPin(pin): Promise<VoidResult> {
+    const { data, error } = await requireClient().rpc("verify_document_pin", { p_pin: pin });
+    if (error) return { ok: false, error: error.message };
+    return data === true ? { ok: true } : { ok: false, error: "That PIN is not correct." };
   },
 
   async updateProfile(userId, profile): Promise<AuthResult> {
@@ -176,7 +196,7 @@ export const supabaseAuthClient: AuthClient = {
     const row = await fetchProfile(userId);
     return {
       ok: true,
-      user: toUser(userId, userData.user?.email ?? "", row),
+      user: toUser(userId, userData.user?.email ?? "", row, await fetchDocumentPinState()),
     };
   },
 
@@ -186,6 +206,6 @@ export const supabaseAuthClient: AuthClient = {
     const sessionUser = data.session?.user;
     if (!sessionUser) return null;
     const row = await fetchProfile(sessionUser.id);
-    return toUser(sessionUser.id, sessionUser.email ?? "", row);
+    return toUser(sessionUser.id, sessionUser.email ?? "", row, await fetchDocumentPinState());
   },
 };

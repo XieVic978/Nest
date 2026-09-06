@@ -10,12 +10,14 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 // Shown after the first successful login, before the app unlocks. Collects the
 // identity details roommates need to recognize each other.
 export default function ProfileSetup() {
-  const { updateProfile, signOut } = useSession();
+  const { updateProfile, setDocumentPin, signOut } = useSession();
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [venmo, setVenmo] = useState("");
   const [zelle, setZelle] = useState("");
+  const [pin, setPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
   const [errors, setErrors] = useState<{ fullName?: string; phone?: string }>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -28,8 +30,22 @@ export default function ProfileSetup() {
     setErrors({ fullName: nameError ?? undefined, phone: phoneError ?? undefined });
     setFormError(null);
     if (nameError || phoneError) return;
+    if (!/^\d{4}$/.test(pin)) {
+      setFormError("Choose a four-digit Documents PIN.");
+      return;
+    }
+    if (pin !== confirmPin) {
+      setFormError("Your PIN entries do not match.");
+      return;
+    }
 
     setSubmitting(true);
+    const pinResult = await setDocumentPin(pin);
+    if (!pinResult.ok) {
+      setSubmitting(false);
+      setFormError(pinResult.error);
+      return;
+    }
     const result = await updateProfile({ fullName, phone, venmo, zelle });
     setSubmitting(false);
     if (!result.ok) setFormError(result.error);
@@ -76,6 +92,24 @@ export default function ProfileSetup() {
         autoCapitalize="none"
         autoCorrect={false}
         placeholder="Email, phone, or handle"
+      />
+      <FormField
+        label="Four-digit Documents PIN"
+        value={pin}
+        onChangeText={setPin}
+        keyboardType="number-pad"
+        secureTextEntry
+        maxLength={4}
+        placeholder="••••"
+      />
+      <FormField
+        label="Confirm Documents PIN"
+        value={confirmPin}
+        onChangeText={setConfirmPin}
+        keyboardType="number-pad"
+        secureTextEntry
+        maxLength={4}
+        placeholder="••••"
       />
 
       {formError ? <Text style={styles.formError}>{formError}</Text> : null}
