@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createRealtimeChannelName } from "@/lib/realtime";
 import { getSupabaseClient } from "@/lib/supabase";
 
-import type { ExpensePaymentStatus, NestExpense, NestExpenseParticipant } from "./types";
+import type { ExpensePaymentStatus, NestExpense, NestExpenseParticipant, NestExpenseSettlement, NestPaymentContact } from "./types";
 
 export type ExpenseInput = {
   title: string;
@@ -18,6 +18,16 @@ export type ExpenseInput = {
 type ParticipantRow = {
   user_id: string;
   payment_status: ExpensePaymentStatus;
+};
+
+type SettlementRow = {
+  id: string;
+  payer_user_id: string;
+  recipient_user_id: string;
+  amount: number | string;
+  payment_method: "venmo" | "zelle" | "other";
+  note: string | null;
+  created_at: string;
 };
 
 function normalizeExpense(row: Record<string, unknown>): NestExpense {
@@ -46,6 +56,8 @@ function normalizeExpense(row: Record<string, unknown>): NestExpense {
 
 export function useExpenses(roomId: string) {
   const [expenses, setExpenses] = useState<NestExpense[]>([]);
+  const [settlements, setSettlements] = useState<NestExpenseSettlement[]>([]);
+  const [contacts, setContacts] = useState<NestPaymentContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,10 +70,23 @@ export function useExpenses(roomId: string) {
       .order("expense_date", { ascending: false })
       .order("created_at", { ascending: false });
 
-    if (loadError) {
-      setError(loadError.message);
+    const [{ data: settlementData, error: settlementError }, { data: contactData, error: contactError }] = await Promise.all([
+      client.from("nest_expense_settlements").select("id, payer_user_id, recipient_user_id, amount, payment_method, note, created_at").eq("room_id", roomId).order("created_at", { ascending: false }),
+      client.rpc("get_nest_payment_contacts", { p_room_id: roomId }),
+    ]);
+
+    if (loadError || settlementError || contactError) {
+      setError(loadError?.message ?? settlementError?.message ?? contactError?.message ?? "Couldn’t load expenses.");
     } else {
       setExpenses((data ?? []).map((row) => normalizeExpense(row as Record<string, unknown>)));
+      setSettlements((settlementData ?? []).map((row) => {
+        const settlement = row as SettlementRow;
+        return { id: settlement.id, payerUserId: settlement.payer_user_id, recipientUserId: settlement.recipient_user_id, amount: Number(settlement.amount), paymentMethod: settlement.payment_method, note: settlement.note ?? "", createdAt: settlement.created_at };
+      }));
+      setContacts((contactData ?? []).map((row: unknown) => {
+        const contact = row as Record<string, unknown>;
+        return { userId: String(contact.user_id), fullName: String(contact.full_name), phone: typeof contact.phone === "string" ? contact.phone : null, venmo: typeof contact.venmo === "string" ? contact.venmo : null, zelle: typeof contact.zelle === "string" ? contact.zelle : null };
+      }));
       setError(null);
     }
     setLoading(false);
@@ -75,6 +100,11 @@ export function useExpenses(roomId: string) {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "nest_expenses", filter: `room_id=eq.${roomId}` },
+        () => void refresh(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "nest_expense_settlements", filter: `room_id=eq.${roomId}` },
         () => void refresh(),
       )
       .on(
@@ -120,5 +150,23 @@ export function useExpenses(roomId: string) {
     await refresh();
   }, [refresh]);
 
-  return { createExpense, error, expenses, loading, refresh, setPaymentStatus };
+  const recordSettlement = useCallback(async (
+    recipientUserId: string,
+    amount: number,
+    paymentMethod: "venmo" | "zelle" | "other",
+    note: string,
+  ) => {
+    const client = getSupabaseClient();
+    const { error: settlementError } = await client.rpc("record_nest_expense_settlement", {
+      p_room_id: roomId,
+      p_recipient_user_id: recipientUserId,
+      p_amount: amount,
+      p_payment_method: paymentMethod,
+      p_note: note,
+    });
+    if (settlementError) throw settlementError;
+    await refresh();
+  }, [refresh, roomId]);
+
+  return { contacts, createExpense, error, expenses, loading, recordSettlement, refresh, settlements, setPaymentStatus };
 }

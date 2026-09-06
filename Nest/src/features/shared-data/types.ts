@@ -70,3 +70,21 @@ export type NestExpense = {
   createdAt: string;
   participants: NestExpenseParticipant[];
 };
+
+export type NestExpenseSettlement = {
+  id: string;
+  payerUserId: string;
+  recipientUserId: string;
+  amount: number;
+  paymentMethod: "venmo" | "zelle" | "other";
+  note: string;
+  createdAt: string;
+};
+
+export type NestPaymentContact = {
+  userId: string;
+  fullName: string;
+  phone: string | null;
+  venmo: string | null;
+  zelle: string | null;
+};
