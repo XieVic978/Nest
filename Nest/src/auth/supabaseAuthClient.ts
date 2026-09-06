@@ -1,11 +1,13 @@
 // Supabase-backed implementation of AuthClient.
 //
-// Auth uses email OTP (a 6-digit code emailed to the user). Profile data lives
+// Auth uses a one-time link emailed to the user. Profile data lives
 // in a `profiles` table keyed by the auth user id. See the setup checklist for
 // the SQL that creates that table and its row-level-security policies.
 //
 // This implements the exact same interface as the mock, so switching backends
 // is a one-line change in ./index.ts.
+
+import * as Linking from "expo-linking";
 
 import { supabase } from "./supabase";
 import { AuthClient } from "./authClient";
@@ -63,29 +65,55 @@ async function fetchProfile(userId: string): Promise<ProfileRow | null> {
 }
 
 export const supabaseAuthClient: AuthClient = {
-  async sendOtp(email): Promise<VoidResult> {
+  async sendMagicLink(email): Promise<VoidResult> {
     const client = requireClient();
     const { error } = await client.auth.signInWithOtp({
       email: normalizeEmail(email),
       // Allow this call to create the auth user if they don't exist yet, so
       // the same flow serves both sign-in and sign-up.
-      options: { shouldCreateUser: true },
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: Linking.createURL("auth/callback"),
+      },
     });
     if (error) return { ok: false, error: error.message };
     return { ok: true };
   },
 
-  async verifyOtp(email, code): Promise<AuthResult> {
+  async completeMagicLink(url): Promise<AuthResult> {
     const client = requireClient();
-    const { data, error } = await client.auth.verifyOtp({
-      email: normalizeEmail(email),
-      token: code.trim(),
-      type: "email",
+
+    // Supabase's implicit mobile flow returns session values in the URL hash.
+    // Error details can also arrive in either the query string or hash.
+    const [beforeHash, hash = ""] = url.split("#", 2);
+    const query = beforeHash.includes("?")
+      ? beforeHash.slice(beforeHash.indexOf("?") + 1)
+      : "";
+    const params = new URLSearchParams(
+      [query, hash].filter(Boolean).join("&")
+    );
+    const linkError = params.get("error_description") ?? params.get("error");
+    if (linkError) {
+      return { ok: false, error: linkError.replace(/\+/g, " ") };
+    }
+
+    const accessToken = params.get("access_token");
+    const refreshToken = params.get("refresh_token");
+    if (!accessToken || !refreshToken) {
+      return {
+        ok: false,
+        error: "This sign-in link is invalid or has expired. Request a new link.",
+      };
+    }
+
+    const { data, error } = await client.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
     });
     if (error || !data.user) {
       return {
         ok: false,
-        error: error?.message ?? "That code isn't correct. Please try again.",
+        error: error?.message ?? "This sign-in link could not be verified.",
       };
     }
     const row = await fetchProfile(data.user.id);

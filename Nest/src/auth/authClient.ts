@@ -6,13 +6,13 @@
 // `supabaseAuthClient` that implements this interface and export it from
 // ./index.ts; no screen or context code needs to change.
 //
-// Authentication uses email OTP (a one-time code sent to the user's email).
-// There are no passwords: the same flow signs in returning users and creates
-// accounts for new emails on first successful verification.
+// Authentication uses a one-time email sign-in link. There are no passwords:
+// the same flow signs in returning users and creates accounts for new emails
+// when the link is opened.
 //
 // Mapping notes for the future Supabase implementation:
-//   sendOtp               -> supabase.auth.signInWithOtp({ email })
-//   verifyOtp             -> supabase.auth.verifyOtp({ email, token, type: "email" })
+//   sendMagicLink         -> supabase.auth.signInWithOtp({ email, options })
+//   completeMagicLink     -> supabase.auth.setSession({ access_token, refresh_token })
 //   signInWithGoogle      -> supabase.auth.signInWithOAuth({ provider: "google" })
 //   signOut               -> supabase.auth.signOut()
 //   updateProfile         -> upsert into a `profiles` table keyed by user id
@@ -21,14 +21,11 @@
 import { AuthResult, User, UserProfile, VoidResult } from "./types";
 
 export interface AuthClient {
-  /** Send a one-time login code to the given email address. */
-  sendOtp(email: string): Promise<VoidResult>;
+  /** Send a one-time sign-in link to the given email address. */
+  sendMagicLink(email: string): Promise<VoidResult>;
 
-  /**
-   * Verify the one-time code for an email. On success, signs in the existing
-   * user or creates a new account (with no profile yet) for a new email.
-   */
-  verifyOtp(email: string, code: string): Promise<AuthResult>;
+  /** Complete sign-in from the URL that opened the app. */
+  completeMagicLink(url: string): Promise<AuthResult>;
 
   /**
    * Sign in with Google (OAuth). On success, signs in the existing user or

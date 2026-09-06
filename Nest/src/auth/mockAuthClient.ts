@@ -19,13 +19,7 @@ interface MockRecord {
 }
 
 const users = new Map<string, MockRecord>(); // key: normalized email
-const pendingCodes = new Map<string, string>(); // key: normalized email -> OTP
 let currentUserId: string | null = null;
-
-// Generate a 6-digit one-time code.
-function generateOtp(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
 
 function generateId(): string {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
@@ -53,7 +47,7 @@ function findById(id: string): MockRecord | undefined {
 }
 
 // Sign in an existing account for the email, or create a new one (no profile
-// yet), then mark it as the current session. Shared by OTP and Google sign-in.
+// yet), then mark it as the current session. Shared by email and Google sign-in.
 function signInOrCreate(email: string): MockRecord {
   const key = normalizeEmail(email);
   let record = users.get(key);
@@ -73,26 +67,20 @@ function signInOrCreate(email: string): MockRecord {
 }
 
 export const mockAuthClient: AuthClient = {
-  async sendOtp(email): Promise<VoidResult> {
+  async sendMagicLink(email): Promise<VoidResult> {
     const key = normalizeEmail(email);
-    const code = generateOtp();
-    pendingCodes.set(key, code);
-    // No real email backend in the mock — surface the code in the dev console
-    // so it can be entered on the verify screen. Supabase emails it instead.
-    console.log(`[Nest OTP] Code for ${key}: ${code}`);
+    console.log(
+      `[Nest magic link] nest://auth/callback?mock_email=${encodeURIComponent(key)}`
+    );
     return { ok: true };
   },
 
-  async verifyOtp(email, code): Promise<AuthResult> {
-    const key = normalizeEmail(email);
-    const expected = pendingCodes.get(key);
-    if (!expected || code.trim() !== expected) {
-      return { ok: false, error: "That code isn't correct. Please try again." };
+  async completeMagicLink(url): Promise<AuthResult> {
+    const match = url.match(/[?&]mock_email=([^&#]+)/);
+    if (!match) {
+      return { ok: false, error: "This mock sign-in link is invalid." };
     }
-    pendingCodes.delete(key);
-
-    // Existing user signs in; a new email creates an account (no profile yet).
-    const record = signInOrCreate(key);
+    const record = signInOrCreate(decodeURIComponent(match[1]));
     return { ok: true, user: toUser(record) };
   },
 
