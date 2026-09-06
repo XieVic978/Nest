@@ -1,7 +1,5 @@
-export const INVITE_LIFETIME_MINUTES = 10;
-
-export function buildInviteLink(token: string): string {
-  return `nest://join/${token}`;
+export function buildInviteLink(code: string): string {
+  return `nest://join/${encodeURIComponent(code)}`;
 }
 
 export function formatInviteCode(code: string): string {

@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Keyboard, Modal, Platform, Pressable, Refresh
 import { router } from "expo-router";
 
 import { SharedCalendar } from "@/components/shared-calendar";
+import { InviteCard } from "@/components/rooms/InviteCard";
 import { useRoom } from "@/features/rooms/RoomProvider";
 import type { RoomSnapshot } from "@/features/rooms/types";
 import { useAnnouncements } from "@/features/shared-data/useAnnouncements";
@@ -11,11 +12,11 @@ import type { NestAnnouncement } from "@/features/shared-data/types";
 type Announcement = NestAnnouncement & { author: string; date: string };
 
 export default function HomeScreen() {
-  const { refresh, room, user } = useRoom();
+  const { nestJoinCode, refresh, regenerateJoinCode, room, user } = useRoom();
 
   if (!room || !user) return null;
 
-  return <HomeContent refreshRoom={refresh} room={room} userId={user.id} />;
+  return <HomeContent nestJoinCode={nestJoinCode} refreshRoom={refresh} regenerateJoinCode={regenerateJoinCode} room={room} userId={user.id} />;
 }
 
 function formatAnnouncementDate(value: string) {
@@ -25,7 +26,7 @@ function formatAnnouncementDate(value: string) {
     : date.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-function HomeContent({ refreshRoom, room, userId }: { refreshRoom: () => Promise<void>; room: RoomSnapshot; userId: string }) {
+function HomeContent({ nestJoinCode, refreshRoom, regenerateJoinCode, room, userId }: { nestJoinCode: string | null; refreshRoom: () => Promise<void>; regenerateJoinCode: () => Promise<string>; room: RoomSnapshot; userId: string }) {
   const { announcements: storedAnnouncements, dismiss, error, loading, markRead, publish: publishAnnouncement, refresh, remove } = useAnnouncements(room.room.id, userId);
   const [formVisible, setFormVisible] = useState(false);
   const [showPast, setShowPast] = useState(false);
@@ -73,6 +74,7 @@ function HomeContent({ refreshRoom, room, userId }: { refreshRoom: () => Promise
       {error ? <Text style={styles.errorText}>Couldn’t load shared announcements: {error}</Text> : null}
       <View style={styles.announcementsViewport}><Text style={styles.scrollHint}>Swipe up to see more announcements</Text><ScrollView nestedScrollEnabled showsVerticalScrollIndicator contentContainerStyle={styles.announcementsList}>{loading ? <ActivityIndicator color="#28634E" style={styles.loading} /> : visibleAnnouncements.length ? visibleAnnouncements.map((item) => <AnnouncementCard key={item.id} canDelete={item.authorUserId === userId || isAdmin} item={item} onRead={() => void markRead(item.id).catch((caught) => showError("Couldn’t mark announcement read", caught))} onDismiss={() => void dismiss(item.id).catch((caught) => showError("Couldn’t dismiss announcement", caught))} onDelete={() => confirmDelete(item)} onOpen={() => void openRelated(item)} />) : <EmptyAnnouncements showPast={showPast} onPost={() => setFormVisible(true)} />}</ScrollView></View>
       <SharedCalendar currentUserName={currentUserName} onActivity={addCalendarAnnouncement} residents={residentNames} roomId={room.room.id} userId={userId} />
+      <InviteCard code={nestJoinCode} onRegenerate={regenerateJoinCode} />
     </ScrollView>
     <AnnouncementForm canPin={isAdmin} visible={formVisible} onClose={() => setFormVisible(false)} onPublish={publish} />
   </View>;

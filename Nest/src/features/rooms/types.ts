@@ -25,12 +25,6 @@ export type RoomSnapshot = {
   members: RoomMember[];
 };
 
-export type RoomInvite = {
-  token: string;
-  code: string;
-  expiresAt: string;
-};
-
 export type JoinResult =
   | { status: "joined" | "already_member"; roomId: string; roomName: string }
   | { status: "switch_required"; roomId: string; roomName: string }

@@ -8,7 +8,7 @@ import type { RoomMember } from "@/features/rooms/types";
 import { confirmAction } from "@/lib/confirmAction";
 
 export default function RoomSettingsScreen() {
-  const { regenerateInvite, removeMember, room, transferAdmin, user } = useRoom();
+  const { regenerateJoinCode, removeMember, room, transferAdmin, user } = useRoom();
   const [busyMember, setBusyMember] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -59,8 +59,8 @@ export default function RoomSettingsScreen() {
   async function regenerate() {
     setNotice(null);
     try {
-      await regenerateInvite();
-      setNotice("A new invitation is ready on the Nest page. Older invites were revoked.");
+      await regenerateJoinCode();
+      setNotice("The permanent Nest code was replaced. The previous code no longer works.");
     } catch (caught) {
       setNotice(toRoomError(caught).message);
     }
@@ -74,7 +74,7 @@ export default function RoomSettingsScreen() {
       <Text style={styles.body}>Manage access to this Nest. Removed members immediately lose access to all room data.</Text>
 
       <View style={styles.inviteRow}>
-        <View style={styles.inviteCopy}><Text style={styles.cardTitle}>Need a new invitation?</Text><Text style={styles.cardBody}>The current link and code will stop working.</Text></View>
+        <View style={styles.inviteCopy}><Text style={styles.cardTitle}>Need a new permanent code?</Text><Text style={styles.cardBody}>The current link and code will stop working.</Text></View>
         <Pressable onPress={() => void regenerate()} style={styles.regenerate}><Text style={styles.regenerateText}>Regenerate</Text></Pressable>
       </View>
 

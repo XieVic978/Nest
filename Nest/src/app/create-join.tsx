@@ -130,7 +130,7 @@ export default function CreateJoinScreen() {
               <Text style={styles.cardTitle}>Join your roommates</Text>
               <Text style={styles.label}>Permanent Nest code</Text>
               <TextInput accessibilityLabel="Permanent Nest code" autoCapitalize="characters" autoCorrect={false} onChangeText={setInvite} placeholder="ABCDE-FGHIJ" placeholderTextColor="#89938E" returnKeyType="go" style={styles.input} value={invite} />
-              <Text style={styles.helper}>Ask any roommate for the 10-character code in Documents.</Text>
+              <Text style={styles.helper}>Ask any roommate for the 10-letter-and-number code in Documents. The hyphen is optional.</Text>
               <Pressable accessibilityRole="button" disabled={submitting} onPress={() => void finishJoin(false)} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, submitting && styles.disabled]}>{submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Join a Nest</Text>}</Pressable>
             </>
           )}
