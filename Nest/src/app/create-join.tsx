@@ -103,12 +103,12 @@ export default function CreateJoinScreen() {
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.eyebrow}>WELCOME HOME</Text>
-        <Text style={styles.title}>Create or join a Nest</Text>
+        <Text style={styles.title}>Create a new Nest or join a Nest</Text>
         <Text style={styles.body}>Bring your roommates and shared home life into one place.</Text>
 
         <View accessibilityRole="tablist" style={styles.segmented}>
-          <Pressable accessibilityRole="tab" accessibilityState={{ selected: mode === "create" }} onPress={() => { setMode("create"); setError(null); }} style={[styles.segment, mode === "create" && styles.segmentActive]}><Text style={[styles.segmentText, mode === "create" && styles.segmentTextActive]}>Create</Text></Pressable>
-          <Pressable accessibilityRole="tab" accessibilityState={{ selected: mode === "join" }} onPress={() => { setMode("join"); setError(null); }} style={[styles.segment, mode === "join" && styles.segmentActive]}><Text style={[styles.segmentText, mode === "join" && styles.segmentTextActive]}>Join</Text></Pressable>
+          <Pressable accessibilityRole="tab" accessibilityState={{ selected: mode === "create" }} onPress={() => { setMode("create"); setError(null); }} style={[styles.segment, mode === "create" && styles.segmentActive]}><Text style={[styles.segmentText, mode === "create" && styles.segmentTextActive]}>Create a new Nest</Text></Pressable>
+          <Pressable accessibilityRole="tab" accessibilityState={{ selected: mode === "join" }} onPress={() => { setMode("join"); setError(null); }} style={[styles.segment, mode === "join" && styles.segmentActive]}><Text style={[styles.segmentText, mode === "join" && styles.segmentTextActive]}>Join a Nest</Text></Pressable>
         </View>
 
         <View style={styles.card}>
@@ -117,16 +117,16 @@ export default function CreateJoinScreen() {
               <Text style={styles.cardTitle}>Name your Nest</Text>
               <Text style={styles.label}>Nest name</Text>
               <TextInput accessibilityLabel="Nest name" autoCapitalize="words" maxLength={60} onChangeText={setRoomName} placeholder="Maple Street House" placeholderTextColor="#89938E" returnKeyType="done" style={styles.input} value={roomName} />
-              <Text style={styles.helper}>You’ll be the admin. An invite link and code will be ready for 10 minutes.</Text>
-              <Pressable accessibilityRole="button" disabled={submitting} onPress={() => void handleCreate()} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, submitting && styles.disabled]}>{submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Create Nest</Text>}</Pressable>
+              <Text style={styles.helper}>Every roommate has equal access. A permanent code will be available in Documents.</Text>
+              <Pressable accessibilityRole="button" disabled={submitting} onPress={() => void handleCreate()} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, submitting && styles.disabled]}>{submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Create a new Nest</Text>}</Pressable>
             </>
           ) : (
             <>
               <Text style={styles.cardTitle}>Join your roommates</Text>
-              <Text style={styles.label}>Invite link or code</Text>
-              <TextInput accessibilityLabel="Invite link or code" autoCapitalize="characters" autoCorrect={false} onChangeText={setInvite} placeholder="ABCDE-FGHIJ" placeholderTextColor="#89938E" returnKeyType="go" style={styles.input} value={invite} />
-              <Text style={styles.helper}>Paste the full app link or enter the 10-character code.</Text>
-              <Pressable accessibilityRole="button" disabled={submitting} onPress={() => void finishJoin(false)} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, submitting && styles.disabled]}>{submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Join Nest</Text>}</Pressable>
+              <Text style={styles.label}>Permanent Nest code</Text>
+              <TextInput accessibilityLabel="Permanent Nest code" autoCapitalize="characters" autoCorrect={false} onChangeText={setInvite} placeholder="ABCDE-FGHIJ" placeholderTextColor="#89938E" returnKeyType="go" style={styles.input} value={invite} />
+              <Text style={styles.helper}>Ask any roommate for the 10-character code in Documents.</Text>
+              <Pressable accessibilityRole="button" disabled={submitting} onPress={() => void finishJoin(false)} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, submitting && styles.disabled]}>{submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Join a Nest</Text>}</Pressable>
             </>
           )}
           {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}

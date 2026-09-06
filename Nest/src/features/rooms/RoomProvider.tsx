@@ -102,16 +102,9 @@ export function RoomProvider({ children }: PropsWithChildren) {
       setNestJoinCode(typeof codeData === "string" ? codeData : null);
       setError(null);
 
-      if (snapshot?.membership.role === "admin") {
-        const { data: inviteData, error: inviteError } = await client.rpc(
-          "get_active_nest_invite",
-          { p_room_id: snapshot.room.id },
-        );
-        if (inviteError) throw inviteError;
-        setActiveInvite(normalizeInvite(inviteData));
-      } else {
-        setActiveInvite(null);
-      }
+      // Every Nest member has the same access. The permanent code is the
+      // single shared joining method, so there is no creator-only invite.
+      setActiveInvite(null);
     } catch (caught) {
       const roomError = toRoomError(caught);
       setRoom(null);
@@ -169,16 +162,15 @@ export function RoomProvider({ children }: PropsWithChildren) {
       });
       if (createError) throw toRoomError(createError);
 
-      const result = data as { invite?: RoomInvite } | null;
-      setActiveInvite(result?.invite ?? null);
+      void data;
+      setActiveInvite(null);
       await refresh();
-      if (result?.invite) setActiveInvite(result.invite);
     },
     [refresh, requireUser],
   );
 
   const joinRoom = useCallback(
-    async (invite: string, confirmLeave = false) => {
+    async (invite: string, _confirmLeave = false) => {
       const currentUser = requireUser();
       const client = getSupabaseClient();
       const normalizedInvite = inviteValueFromInput(invite);
@@ -189,10 +181,9 @@ export function RoomProvider({ children }: PropsWithChildren) {
         );
       }
 
-      const { data, error: joinError } = await client.rpc("join_nest", {
-        p_confirm_leave: confirmLeave,
+      const { data, error: joinError } = await client.rpc("join_nest_by_code", {
         p_display_name: getDisplayName(currentUser),
-        p_invite: normalizedInvite,
+        p_code: normalizedInvite,
       });
       if (joinError) throw toRoomError(joinError);
 
