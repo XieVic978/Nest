@@ -13,6 +13,7 @@ type ChoreInput = {
   priority: ChorePriority;
   recurrence: ChoreRecurrence;
   rotationUserIds: string[];
+  displayOnCalendar: boolean;
 };
 
 const recurrenceToDatabase: Record<ChoreRecurrence, string> = {
@@ -41,6 +42,7 @@ function normalizeChore(row: Record<string, unknown>): NestChore {
     priority: `${String(row.priority).slice(0, 1).toUpperCase()}${String(row.priority).slice(1)}` as ChorePriority,
     recurrence: recurrenceFromDatabase[String(row.recurrence)] ?? "Once",
     rotationUserIds: Array.isArray(row.rotation_user_ids) ? row.rotation_user_ids.map(String) : [],
+    displayOnCalendar: row.display_on_calendar !== false,
     createdBy: String(row.created_by),
     completedBy: row.completed_by ? String(row.completed_by) : null,
     completedAt: row.completed_at ? String(row.completed_at) : null,
@@ -98,6 +100,7 @@ export function useChores(roomId: string, userId: string) {
       priority: input.priority.toLowerCase(),
       recurrence: recurrenceToDatabase[input.recurrence],
       rotation_user_ids: input.rotationUserIds,
+      display_on_calendar: input.displayOnCalendar,
     };
     const result = id
       ? await client.from("chores").update(values).eq("id", id).eq("room_id", roomId)
