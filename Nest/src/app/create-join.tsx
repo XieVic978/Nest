@@ -91,7 +91,7 @@ export default function CreateJoinScreen() {
   }
 
   if (loading) {
-    return <View style={styles.center}><ActivityIndicator color="#28634E" size="large" /></View>;
+    return <View style={styles.center}><ActivityIndicator color="#4975A8" size="large" /></View>;
   }
 
   if (!configurationReady) {

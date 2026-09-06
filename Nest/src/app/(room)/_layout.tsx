@@ -18,7 +18,7 @@ export default function RoomLayout() {
   const { error, loading, room, user } = useRoom();
 
   if (loading) {
-    return <View style={styles.center}><ActivityIndicator color="#28634E" size="large" /><Text style={styles.status}>Opening your Nest…</Text></View>;
+    return <View style={styles.center}><ActivityIndicator color="#4975A8" size="large" /><Text style={styles.status}>Opening your Nest…</Text></View>;
   }
 
   if (!user) return <Redirect href="/(auth)/sign-in" />;
