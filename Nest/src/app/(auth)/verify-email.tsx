@@ -20,7 +20,7 @@ export default function VerifyEmail() {
   const isRecovery = purpose === "recovery";
 
   async function handleVerify() {
-    if (!/^\d{6}$/.test(code.trim())) return setFormError("Enter the 6-digit code from your email.");
+    if (!/^\d{8}$/.test(code.trim())) return setFormError("Enter the 8-digit code from your email.");
     if (isRecovery) {
       const passwordError = validatePassword(newPassword);
       if (passwordError) return setFormError(passwordError);
@@ -44,8 +44,8 @@ export default function VerifyEmail() {
   }
 
   return (
-    <FormScreen title={isRecovery ? "Enter your reset code" : "Check your email"} subtitle={`Enter the 6-digit code sent to ${email}. No browser link is needed.`}>
-      <FormField label="Verification code" value={code} onChangeText={setCode} keyboardType="number-pad" textContentType="oneTimeCode" maxLength={6} placeholder="123456" />
+    <FormScreen title={isRecovery ? "Enter your reset code" : "Check your email"} subtitle={`Enter the 8-digit code sent to ${email}. No browser link is needed.`}>
+      <FormField label="Verification code" value={code} onChangeText={setCode} keyboardType="number-pad" textContentType="oneTimeCode" maxLength={8} placeholder="12345678" />
       {isRecovery ? <><FormField label="New password" value={newPassword} onChangeText={setNewPassword} secureTextEntry autoComplete="new-password" textContentType="newPassword" placeholder="At least 8 characters" /><FormField label="Confirm new password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry autoComplete="new-password" textContentType="newPassword" placeholder="Enter it again" /></> : null}
       {formError ? <Text style={styles.error}>{formError}</Text> : null}
       {notice ? <Text style={styles.notice}>{notice}</Text> : null}
