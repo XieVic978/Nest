@@ -1,6 +1,6 @@
 // Supabase-backed implementation of AuthClient.
 //
-// Auth uses a one-time link emailed to the user. Profile data lives
+// Auth uses email/password with one-time verification codes. Profile data lives
 // in a `profiles` table keyed by the auth user id. See the setup checklist for
 // the SQL that creates that table and its row-level-security policies.
 //
@@ -74,11 +74,24 @@ async function fetchDocumentPinState(): Promise<boolean> {
 export const supabaseAuthClient: AuthClient = {
   async signUp(email, password): Promise<VoidResult> {
     const client = requireClient();
-    const { error } = await client.auth.signUp({
-      email: normalizeEmail(email),
+    const normalizedEmail = normalizeEmail(email);
+    const { data, error } = await client.auth.signUp({
+      email: normalizedEmail,
       password,
     });
     if (error) return { ok: false, error: error.message };
+
+    // With email confirmation enabled, Supabase returns a generic successful
+    // response for an existing account but leaves `identities` empty. Treat
+    // that response as an existing account rather than taking the person to
+    // a verification screen that cannot send another signup code.
+    if (!data.user?.identities?.length) {
+      return {
+        ok: false,
+        error: "An account already exists with this email. Log in or reset your password instead.",
+      };
+    }
+
     return { ok: true };
   },
 
