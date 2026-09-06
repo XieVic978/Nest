@@ -1,5 +1,22 @@
 # Nest
 
+## Tech stack
+
+| Area | Technology | How Nest uses it |
+| --- | --- | --- |
+| Mobile and web app | Expo SDK 57, React Native, React | One shared application for iOS, Android, and web development |
+| Language | TypeScript | Typed screens, components, authentication, and shared-data features |
+| Navigation | Expo Router | File-based authentication, onboarding, profile, and Nest tab routes |
+| Backend | Supabase | Hosted application backend and client API |
+| Database | PostgreSQL | Stores profiles, rooms, members, invitations, chores, groceries, announcements, notes, calendar events, and expenses |
+| Authentication | Supabase Auth | Email OTP sign-in and authenticated user sessions |
+| Live synchronization | Supabase Realtime | Keeps shared Nest data updated for every roommate |
+| Authorization | PostgreSQL Row Level Security | Restricts each room's information to its current members |
+| File storage | Supabase Storage | Stores receipt images associated with shared expenses |
+| Device features | Expo Image Picker, Clipboard, Linking, and FileSystem | Selects receipts, copies Nest codes, opens supported links, and handles local files |
+| Email delivery | Resend through Supabase SMTP | Delivers authentication emails from the Nest domain |
+| Collaboration | Git and GitHub | Branches, pull requests, reviews, and merge-conflict resolution |
+
 ## Page file map
 
 Each screen is intentionally bare so one teammate can build it without touching the others.
