@@ -92,16 +92,6 @@ create trigger sync_chore_calendar_event_trigger
 after insert or update of title, description, due_date, display_on_calendar on public.chores
 for each row execute function private.sync_chore_calendar_event();
 
-insert into public.calendar_events (
-  room_id, title, description, start_date, start_time, end_date, end_time,
-  category, all_day, source_chore_id, created_by
-)
-select room_id, title, description, due_date, 'All day', due_date, 'All day',
-  'chore', true, id, created_by
-from public.chores
-where display_on_calendar
-on conflict (source_chore_id) do nothing;
-
 drop policy if exists "members can read calendar events" on public.calendar_events;
 create policy "members can read calendar events"
 on public.calendar_events for select to authenticated
