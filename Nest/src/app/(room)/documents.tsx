@@ -1,5 +1,5 @@
 import * as Clipboard from "expo-clipboard";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import {
   Keyboard,
@@ -16,12 +16,14 @@ import {
 
 import { useSession } from "@/auth/ctx";
 import { useRoom } from "@/features/rooms/RoomProvider";
+import { useSharedNote } from "@/features/shared-data/useSharedNote";
 
 const PIN_LENGTH = 4;
 
 export default function DocumentsScreen() {
-  const { nestJoinCode } = useRoom();
+  const { nestJoinCode, room, user } = useRoom();
   const { resetDocumentPin, verifyDocumentPin } = useSession();
+  const { error: noteError, loading: noteLoading, note, saveContent } = useSharedNote(room?.room.id ?? "", user?.id ?? "");
   const pinInput = useRef<TextInput>(null);
   const [pin, setPin] = useState("");
   const [unlocked, setUnlocked] = useState(false);
@@ -34,6 +36,9 @@ export default function DocumentsScreen() {
   const [confirmPin, setConfirmPin] = useState("");
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [edited, setEdited] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   // Tabs stay mounted while people move through Nest. Lock Documents whenever
   // this screen loses focus, then focus the PIN field when it is opened again.
@@ -54,6 +59,13 @@ export default function DocumentsScreen() {
       };
     }, []),
   );
+
+  useEffect(() => { if (!edited) setDraft(note?.content ?? ""); }, [edited, note?.content]);
+  useEffect(() => {
+    if (!unlocked || !edited) return;
+    const timer = setTimeout(() => { setSaving(true); void saveContent(draft).then(() => setEdited(false)).catch((caught) => setError(caught instanceof Error ? caught.message : "Couldn’t save your note.")).finally(() => setSaving(false)); }, 650);
+    return () => clearTimeout(timer);
+  }, [draft, edited, saveContent, unlocked]);
 
   async function unlock() {
     Keyboard.dismiss();
@@ -99,10 +111,10 @@ export default function DocumentsScreen() {
 
   return (
     <View style={styles.screen}>
-      <Text style={styles.title}>Documents</Text>
+      <Text style={styles.title}>Notes</Text>
       {!unlocked ? (
         <>
-          <Text style={styles.body}>Enter your four-digit Nest PIN to access shared documents.</Text>
+          <Text style={styles.body}>Enter your four-digit Nest PIN to access your shared household note.</Text>
           <TextInput ref={pinInput} accessibilityLabel="Four digit PIN" autoFocus keyboardType="number-pad" maxLength={PIN_LENGTH} onChangeText={(value) => { setPin(value); setError(null); }} onSubmitEditing={() => void unlock()} placeholder="4-digit PIN" secureTextEntry style={styles.input} textContentType="oneTimeCode" value={pin} />
           <Pressable accessibilityRole="button" onPress={Keyboard.dismiss} style={styles.dismissKeyboard}><Text style={styles.dismissKeyboardText}>Done entering PIN</Text></Pressable>
           <Pressable accessibilityRole="button" disabled={pin.length !== PIN_LENGTH || checking} onPress={() => void unlock()} style={[styles.button, (pin.length !== PIN_LENGTH || checking) && styles.disabled]}><Text style={styles.buttonText}>{checking ? "Checking…" : "Unlock documents"}</Text></Pressable>
@@ -112,9 +124,11 @@ export default function DocumentsScreen() {
         </>
       ) : (
         <>
-          <Text style={styles.body}>Shared documents will appear here.</Text>
           <Text style={styles.label}>PERMANENT NEST CODE</Text>
           <Pressable accessibilityLabel="Copy permanent Nest code" accessibilityRole="button" onPress={() => nestJoinCode && void Clipboard.setStringAsync(nestJoinCode)} style={styles.code}><Text style={styles.codeText}>{nestJoinCode ?? "Loading…"}</Text><Text style={styles.copy}>TAP TO COPY</Text></Pressable>
+          <View style={styles.noteHeader}><View><Text style={styles.noteTitle}>Shared house note</Text><Text style={styles.noteSubtitle}>Everything saves automatically for your roommates.</Text></View><Text style={styles.saveState}>{saving ? "Saving…" : noteLoading ? "Loading…" : "Live"}</Text></View>
+          {noteError ? <Text style={styles.error}>Couldn’t load the shared note: {noteError}</Text> : null}
+          <TextInput accessibilityLabel="Shared house note" multiline onChangeText={(value) => { setDraft(value); setEdited(true); }} placeholder="Start writing anything your household needs to remember…" style={styles.noteInput} textAlignVertical="top" value={draft} />
         </>
       )}
 
@@ -152,7 +166,7 @@ const styles = StyleSheet.create({
   dismissKeyboard: { alignSelf: "flex-end", paddingVertical: 10, paddingHorizontal: 2 }, dismissKeyboardText: { color: "#28634E", fontSize: 13, fontWeight: "800" },
   resetLink: { alignSelf: "flex-start", marginTop: 16 }, resetLinkText: { color: "#28634E", fontSize: 14, fontWeight: "800" },
   label: { color: "#64716B", fontSize: 11, fontWeight: "800", letterSpacing: 1, marginTop: 20, marginBottom: 7 },
-  code: { backgroundColor: "white", borderWidth: 1, borderColor: "#E4E8E3", borderRadius: 12, padding: 16 }, codeText: { color: "#18251F", fontSize: 22, fontWeight: "900", letterSpacing: 2 }, copy: { color: "#28634E", fontSize: 10, fontWeight: "800", marginTop: 5 },
+  code: { backgroundColor: "white", borderWidth: 1, borderColor: "#E4E8E3", borderRadius: 12, padding: 16 }, codeText: { color: "#18251F", fontSize: 22, fontWeight: "900", letterSpacing: 2 }, copy: { color: "#28634E", fontSize: 10, fontWeight: "800", marginTop: 5 }, noteHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 10, marginTop: 24 }, noteTitle: { color: "#18251F", fontSize: 20, fontWeight: "900" }, noteSubtitle: { color: "#64716B", fontSize: 12, marginTop: 3 }, saveState: { color: "#28634E", fontSize: 12, fontWeight: "800" }, noteInput: { backgroundColor: "#FFFFFF", borderColor: "#E4E8E3", borderRadius: 14, borderWidth: 1, color: "#18251F", flex: 1, fontSize: 17, lineHeight: 25, minHeight: 260, padding: 16 },
   modalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(12, 25, 18, 0.48)" }, modalCard: { maxHeight: "88%", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, backgroundColor: "#F7F5EF" },
   modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }, modalTitle: { color: "#18251F", fontSize: 22, fontWeight: "900" }, close: { color: "#28634E", fontWeight: "900" },
   modalBody: { color: "#64716B", lineHeight: 21, marginBottom: 18 }, fieldLabel: { color: "#64716B", fontSize: 11, fontWeight: "800", letterSpacing: 1, marginTop: 14, marginBottom: 7 },
