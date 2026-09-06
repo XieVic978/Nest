@@ -6,30 +6,18 @@
 // `supabaseAuthClient` that implements this interface and export it from
 // ./index.ts; no screen or context code needs to change.
 //
-// Authentication uses a six-digit email OTP. There are no passwords: the same
-// flow signs in returning users and creates accounts for new emails when the
-// code is verified.
-//
-// Mapping notes for the future Supabase implementation:
-//   sendEmailOtp          -> supabase.auth.signInWithOtp({ email, options })
-//   verifyEmailOtp        -> supabase.auth.verifyOtp({ email, token, type: "email" })
-//   completeMagicLink     -> supabase.auth.setSession({ access_token, refresh_token })
-//   signInWithGoogle      -> supabase.auth.signInWithOAuth({ provider: "google" })
-//   signOut               -> supabase.auth.signOut()
-//   updateProfile         -> upsert into a `profiles` table keyed by user id
-//   getCurrentUser        -> supabase.auth.getSession() + fetch profile row
+// Nest uses email/password accounts. When email confirmation is enabled in
+// Supabase, new accounts are verified by typing the emailed code in the app.
 
 import { AuthResult, User, UserProfile, VoidResult } from "./types";
 
 export interface AuthClient {
-  /** Send a six-digit one-time sign-in code to the given email address. */
-  sendEmailOtp(email: string): Promise<VoidResult>;
-
-  /** Verify an emailed code and establish the authenticated session. */
-  verifyEmailOtp(email: string, token: string): Promise<AuthResult>;
-
-  /** Complete sign-in from the URL that opened the app. */
-  completeMagicLink(url: string): Promise<AuthResult>;
+  signUp(email: string, password: string): Promise<VoidResult>;
+  signInWithPassword(email: string, password: string): Promise<AuthResult>;
+  verifyEmailCode(email: string, code: string): Promise<AuthResult>;
+  resendVerificationCode(email: string): Promise<VoidResult>;
+  sendPasswordResetCode(email: string): Promise<VoidResult>;
+  resetPasswordWithCode(email: string, code: string, password: string): Promise<AuthResult>;
 
   /**
    * Sign in with Google (OAuth). On success, signs in the existing user or
@@ -45,6 +33,9 @@ export interface AuthClient {
    * phone, Venmo, and Zelle are optional.
    */
   updateProfile(userId: string, profile: UserProfile): Promise<AuthResult>;
+
+  setDocumentPin(pin: string): Promise<VoidResult>;
+  verifyDocumentPin(pin: string): Promise<VoidResult>;
 
   /** Return the currently authenticated user, or null. */
   getCurrentUser(): Promise<User | null>;

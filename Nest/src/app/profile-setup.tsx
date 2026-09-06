@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useSession } from "@/auth/ctx";
 import { validateFullName, validatePhone } from "@/auth/validation";
@@ -10,15 +10,28 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 // Shown after the first successful login, before the app unlocks. Collects the
 // identity details roommates need to recognize each other.
 export default function ProfileSetup() {
-  const { updateProfile, signOut } = useSession();
+  const { updateProfile, setDocumentPin, signOut } = useSession();
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [venmo, setVenmo] = useState("");
   const [zelle, setZelle] = useState("");
+  const [pin, setPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
   const [errors, setErrors] = useState<{ fullName?: string; phone?: string }>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  function confirmSignOut() {
+    Alert.alert(
+      "Sign out of Nest?",
+      "Your incomplete profile setup will stay unfinished until you log back in.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Sign out", style: "destructive", onPress: () => void signOut() },
+      ],
+    );
+  }
 
   async function handleSubmit() {
     // Name is required; phone (and Venmo/Zelle) are optional. Phone is only
@@ -28,8 +41,22 @@ export default function ProfileSetup() {
     setErrors({ fullName: nameError ?? undefined, phone: phoneError ?? undefined });
     setFormError(null);
     if (nameError || phoneError) return;
+    if (!/^\d{4}$/.test(pin)) {
+      setFormError("Choose a four-digit Documents PIN.");
+      return;
+    }
+    if (pin !== confirmPin) {
+      setFormError("Your PIN entries do not match.");
+      return;
+    }
 
     setSubmitting(true);
+    const pinResult = await setDocumentPin(pin);
+    if (!pinResult.ok) {
+      setSubmitting(false);
+      setFormError(pinResult.error);
+      return;
+    }
     const result = await updateProfile({ fullName, phone, venmo, zelle });
     setSubmitting(false);
     if (!result.ok) setFormError(result.error);
@@ -77,13 +104,31 @@ export default function ProfileSetup() {
         autoCorrect={false}
         placeholder="Email, phone, or handle"
       />
+      <FormField
+        label="Four-digit Documents PIN"
+        value={pin}
+        onChangeText={setPin}
+        keyboardType="number-pad"
+        secureTextEntry
+        maxLength={4}
+        placeholder="••••"
+      />
+      <FormField
+        label="Confirm Documents PIN"
+        value={confirmPin}
+        onChangeText={setConfirmPin}
+        keyboardType="number-pad"
+        secureTextEntry
+        maxLength={4}
+        placeholder="••••"
+      />
 
       {formError ? <Text style={styles.formError}>{formError}</Text> : null}
 
       <PrimaryButton title="Continue" onPress={handleSubmit} loading={submitting} />
 
       <View style={styles.footer}>
-        <Pressable accessibilityRole="button" onPress={signOut}>
+        <Pressable accessibilityRole="button" onPress={confirmSignOut}>
           <Text style={styles.link}>Sign out</Text>
         </Pressable>
       </View>

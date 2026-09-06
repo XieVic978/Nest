@@ -14,16 +14,10 @@ import {
   getSupabaseClient,
   isSupabaseConfigured,
 } from "@/lib/supabase";
-import { createRealtimeChannelName } from "@/lib/realtime";
 
 import { RoomError, toRoomError } from "./errors";
 import { inviteValueFromInput } from "./invite";
-import type {
-  JoinResult,
-  LeaveNestResult,
-  RoomInvite,
-  RoomSnapshot,
-} from "./types";
+import type { JoinResult, RoomInvite, RoomSnapshot } from "./types";
 
 type RoomContextValue = {
   activeInvite: RoomInvite | null;
@@ -31,7 +25,8 @@ type RoomContextValue = {
   createRoom: (name: string) => Promise<void>;
   error: string | null;
   joinRoom: (invite: string, confirmLeave?: boolean) => Promise<JoinResult>;
-  leaveRoom: () => Promise<LeaveNestResult>;
+  leaveNest: () => Promise<void>;
+  nestJoinCode: string | null;
   loading: boolean;
   pendingInvite: string | null;
   clearPendingInvite: () => void;
@@ -70,6 +65,7 @@ export function RoomProvider({ children }: PropsWithChildren) {
   const [room, setRoom] = useState<RoomSnapshot | null>(null);
   const [activeInvite, setActiveInvite] = useState<RoomInvite | null>(null);
   const [pendingInvite, setPendingInvite] = useState<string | null>(null);
+  const [nestJoinCode, setNestJoinCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,6 +73,7 @@ export function RoomProvider({ children }: PropsWithChildren) {
     if (!isSupabaseConfigured) {
       setRoom(null);
       setActiveInvite(null);
+      setNestJoinCode(null);
       setError(
         "Supabase is not configured yet. Add the Expo public Supabase URL and publishable key.",
       );
@@ -87,6 +84,7 @@ export function RoomProvider({ children }: PropsWithChildren) {
     if (!user) {
       setRoom(null);
       setActiveInvite(null);
+      setNestJoinCode(null);
       setError(null);
       setLoading(false);
       return;
@@ -99,24 +97,14 @@ export function RoomProvider({ children }: PropsWithChildren) {
 
       const snapshot = normalizeSnapshot(data);
       setRoom(snapshot);
+      const { data: codeData, error: codeError } = await client.rpc("get_nest_join_code");
+      if (codeError) throw codeError;
+      setNestJoinCode(typeof codeData === "string" ? codeData : null);
       setError(null);
 
-      if (snapshot) {
-        const { data: inviteData, error: inviteError } = await client.rpc(
-          "get_active_nest_invite",
-          { p_room_id: snapshot.room.id },
-        );
-        if (inviteError) {
-          // A missing/expired invite must not hide a valid room membership.
-          // Any member can regenerate the invite from the Nest home screen.
-          console.warn("[Nest] Could not load the active invite:", inviteError.message);
-          setActiveInvite(null);
-        } else {
-          setActiveInvite(normalizeInvite(inviteData));
-        }
-      } else {
-        setActiveInvite(null);
-      }
+      // Every Nest member has the same access. The permanent code is the
+      // single shared joining method, so there is no creator-only invite.
+      setActiveInvite(null);
     } catch (caught) {
       const roomError = toRoomError(caught);
       setRoom(null);
@@ -136,23 +124,13 @@ export function RoomProvider({ children }: PropsWithChildren) {
 
     const client = getSupabaseClient();
     const channel = client
-      .channel(createRealtimeChannelName(`nest-members-${room.room.id}`))
+      .channel(`nest-members-${room.room.id}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "room_members",
-          filter: `room_id=eq.${room.room.id}`,
-        },
-        () => void refresh(),
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "room_invites",
           filter: `room_id=eq.${room.room.id}`,
         },
         () => void refresh(),
@@ -182,27 +160,17 @@ export function RoomProvider({ children }: PropsWithChildren) {
         p_display_name: getDisplayName(currentUser),
         p_name: name.trim(),
       });
-      if (createError) {
-        const normalizedError = toRoomError(createError);
-        if (normalizedError.code === "already_in_nest") {
-          // The database is the source of truth. Recover stale client state by
-          // loading the existing membership instead of showing a create error.
-          await refresh();
-          return;
-        }
-        throw normalizedError;
-      }
+      if (createError) throw toRoomError(createError);
 
-      const result = data as { invite?: RoomInvite } | null;
-      setActiveInvite(result?.invite ?? null);
+      void data;
+      setActiveInvite(null);
       await refresh();
-      if (result?.invite) setActiveInvite(result.invite);
     },
     [refresh, requireUser],
   );
 
   const joinRoom = useCallback(
-    async (invite: string, confirmLeave = false) => {
+    async (invite: string, _confirmLeave = false) => {
       const currentUser = requireUser();
       const client = getSupabaseClient();
       const normalizedInvite = inviteValueFromInput(invite);
@@ -213,10 +181,9 @@ export function RoomProvider({ children }: PropsWithChildren) {
         );
       }
 
-      const { data, error: joinError } = await client.rpc("join_nest", {
-        p_confirm_leave: confirmLeave,
+      const { data, error: joinError } = await client.rpc("join_nest_by_code", {
         p_display_name: getDisplayName(currentUser),
-        p_invite: normalizedInvite,
+        p_code: normalizedInvite,
       });
       if (joinError) throw toRoomError(joinError);
 
@@ -229,6 +196,20 @@ export function RoomProvider({ children }: PropsWithChildren) {
     },
     [refresh, requireUser],
   );
+
+  const leaveNest = useCallback(async () => {
+    const client = getSupabaseClient();
+    const { error: leaveError } = await client.rpc("leave_nest");
+    if (leaveError) throw toRoomError(leaveError);
+
+    // Update local room state before the background refresh so the profile
+    // screen can immediately route the member to Create / Join Nest.
+    setRoom(null);
+    setActiveInvite(null);
+    setNestJoinCode(null);
+    setError(null);
+    void refresh();
+  }, [refresh]);
 
   const regenerateInvite = useCallback(async () => {
     if (!room) throw new RoomError("You do not belong to a Nest.");
@@ -243,26 +224,6 @@ export function RoomProvider({ children }: PropsWithChildren) {
     setActiveInvite(invite);
     return invite;
   }, [room]);
-
-  const leaveRoom = useCallback(async () => {
-    requireUser();
-    if (!room) throw new RoomError("You do not belong to a Nest.");
-
-    const client = getSupabaseClient();
-    const { data, error: leaveError } = await client.rpc("leave_nest");
-    if (leaveError) throw toRoomError(leaveError);
-
-    const result = data as LeaveNestResult | null;
-    if (!result || result.status !== "left") {
-      throw new RoomError("The Nest could not be left. Please try again.");
-    }
-
-    setRoom(null);
-    setActiveInvite(null);
-    setPendingInvite(null);
-    setError(null);
-    return result;
-  }, [requireUser, room]);
 
   const removeMember = useCallback(
     async (userId: string) => {
@@ -300,8 +261,9 @@ export function RoomProvider({ children }: PropsWithChildren) {
       createRoom,
       error,
       joinRoom,
-      leaveRoom,
+      leaveNest,
       loading,
+      nestJoinCode,
       pendingInvite,
       refresh,
       regenerateInvite,
@@ -316,8 +278,9 @@ export function RoomProvider({ children }: PropsWithChildren) {
       createRoom,
       error,
       joinRoom,
-      leaveRoom,
+      leaveNest,
       loading,
+      nestJoinCode,
       pendingInvite,
       refresh,
       regenerateInvite,

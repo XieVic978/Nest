@@ -17,6 +17,12 @@ export function validateFullName(name: string): string | null {
   return null;
 }
 
+export function validatePassword(password: string): string | null {
+  if (!password) return "Password is required.";
+  if (password.length < 8) return "Use at least 8 characters.";
+  return null;
+}
+
 // Phone number is optional. When provided, it must look like a valid number:
 // digits, spaces, dashes, parens, and an optional leading +, with 10–15 digits
 // once separators are stripped. An empty value is allowed.

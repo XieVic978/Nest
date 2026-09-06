@@ -1,6 +1,6 @@
 // Supabase-backed implementation of AuthClient.
 //
-// Auth uses a six-digit one-time code emailed to the user. Profile data lives
+// Auth uses email/password with one-time verification codes. Profile data lives
 // in a `profiles` table keyed by the auth user id. See the setup checklist for
 // the SQL that creates that table and its row-level-security policies.
 //
@@ -32,7 +32,7 @@ function requireClient() {
 
 // Build the app's User from an auth id/email + a (possibly missing) profile row.
 // A profile is considered complete once the full name is set.
-function toUser(id: string, email: string, row: ProfileRow | null): User {
+function toUser(id: string, email: string, row: ProfileRow | null, hasDocumentPin = false): User {
   const profile: UserProfile | null = row?.full_name
     ? {
         fullName: row.full_name,
@@ -41,7 +41,7 @@ function toUser(id: string, email: string, row: ProfileRow | null): User {
         ...(row.zelle ? { zelle: row.zelle } : {}),
       }
     : null;
-  return { id, email, profile };
+  return { id, email, profile, hasDocumentPin };
 }
 
 // Fetch the profile row for a user id, or null if none exists yet.
@@ -62,83 +62,103 @@ async function fetchProfile(userId: string): Promise<ProfileRow | null> {
   return (data as ProfileRow) ?? null;
 }
 
+async function fetchDocumentPinState(): Promise<boolean> {
+  const { data, error } = await requireClient().rpc("has_document_pin");
+  if (error) {
+    console.warn("[Nest] Could not read Documents PIN state:", error.message);
+    return false;
+  }
+  return data === true;
+}
+
 export const supabaseAuthClient: AuthClient = {
-  async sendEmailOtp(email): Promise<VoidResult> {
+  async signUp(email, password): Promise<VoidResult> {
     const client = requireClient();
-    const { error } = await client.auth.signInWithOtp({
-      email: normalizeEmail(email),
-      // Allow this call to create the auth user if they don't exist yet, so
-      // the same flow serves both sign-in and sign-up.
-      options: {
-        shouldCreateUser: true,
-      },
+    const normalizedEmail = normalizeEmail(email);
+    const { data, error } = await client.auth.signUp({
+      email: normalizedEmail,
+      password,
     });
     if (error) return { ok: false, error: error.message };
+
+    // With email confirmation enabled, Supabase returns a generic successful
+    // response for an existing account but leaves `identities` empty. Treat
+    // that response as an existing account rather than taking the person to
+    // a verification screen that cannot send another signup code.
+    if (!data.user?.identities?.length) {
+      return {
+        ok: false,
+        error: "An account already exists with this email. Log in or reset your password instead.",
+      };
+    }
+
     return { ok: true };
   },
 
-  async verifyEmailOtp(email, token): Promise<AuthResult> {
+  async signInWithPassword(email, password): Promise<AuthResult> {
     const client = requireClient();
-    const { data, error } = await client.auth.verifyOtp({
+    const { data, error } = await client.auth.signInWithPassword({
       email: normalizeEmail(email),
-      token: token.trim(),
-      type: "email",
+      password,
     });
     if (error || !data.user) {
       return {
         ok: false,
-        error: error?.message ?? "This code could not be verified.",
+        error: error?.message ?? "We couldn't sign you in.",
       };
     }
-
     const row = await fetchProfile(data.user.id);
     return {
       ok: true,
-      user: toUser(data.user.id, data.user.email ?? "", row),
+      user: toUser(data.user.id, data.user.email ?? "", row, await fetchDocumentPinState()),
     };
   },
 
-  async completeMagicLink(url): Promise<AuthResult> {
+  async verifyEmailCode(email, code): Promise<AuthResult> {
     const client = requireClient();
-
-    // Supabase's implicit mobile flow returns session values in the URL hash.
-    // Error details can also arrive in either the query string or hash.
-    const [beforeHash, hash = ""] = url.split("#", 2);
-    const query = beforeHash.includes("?")
-      ? beforeHash.slice(beforeHash.indexOf("?") + 1)
-      : "";
-    const params = new URLSearchParams(
-      [query, hash].filter(Boolean).join("&")
-    );
-    const linkError = params.get("error_description") ?? params.get("error");
-    if (linkError) {
-      return { ok: false, error: linkError.replace(/\+/g, " ") };
-    }
-
-    const accessToken = params.get("access_token");
-    const refreshToken = params.get("refresh_token");
-    if (!accessToken || !refreshToken) {
-      return {
-        ok: false,
-        error: "This sign-in link is invalid or has expired. Request a new link.",
-      };
-    }
-
-    const { data, error } = await client.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
+    const { data, error } = await client.auth.verifyOtp({
+      email: normalizeEmail(email),
+      token: code.trim(),
+      type: "signup",
     });
     if (error || !data.user) {
-      return {
-        ok: false,
-        error: error?.message ?? "This sign-in link could not be verified.",
-      };
+      return { ok: false, error: error?.message ?? "That verification code isn't valid." };
     }
     const row = await fetchProfile(data.user.id);
-    return {
-      ok: true,
-      user: toUser(data.user.id, data.user.email ?? "", row),
-    };
+    return { ok: true, user: toUser(data.user.id, data.user.email ?? "", row, await fetchDocumentPinState()) };
+  },
+
+  async resendVerificationCode(email): Promise<VoidResult> {
+    const client = requireClient();
+    const { error } = await client.auth.resend({
+      type: "signup",
+      email: normalizeEmail(email),
+    });
+    return error ? { ok: false, error: error.message } : { ok: true };
+  },
+
+  async sendPasswordResetCode(email): Promise<VoidResult> {
+    const client = requireClient();
+    const { error } = await client.auth.resetPasswordForEmail(normalizeEmail(email));
+    return error ? { ok: false, error: error.message } : { ok: true };
+  },
+
+  async resetPasswordWithCode(email, code, password): Promise<AuthResult> {
+    const client = requireClient();
+    const { data, error } = await client.auth.verifyOtp({
+      email: normalizeEmail(email),
+      token: code.trim(),
+      type: "recovery",
+    });
+    if (error || !data.user) {
+      return { ok: false, error: error?.message ?? "That reset code isn't valid." };
+    }
+    const { data: updated, error: updateError } = await client.auth.updateUser({ password });
+    if (updateError || !updated.user) {
+      return { ok: false, error: updateError?.message ?? "We couldn't update your password." };
+    }
+    const row = await fetchProfile(updated.user.id);
+    return { ok: true, user: toUser(updated.user.id, updated.user.email ?? "", row, await fetchDocumentPinState()) };
   },
 
   async signInWithGoogle(): Promise<AuthResult> {
@@ -154,6 +174,17 @@ export const supabaseAuthClient: AuthClient = {
   async signOut(): Promise<void> {
     const client = requireClient();
     await client.auth.signOut();
+  },
+
+  async setDocumentPin(pin): Promise<VoidResult> {
+    const { error } = await requireClient().rpc("set_document_pin", { p_pin: pin });
+    return error ? { ok: false, error: error.message } : { ok: true };
+  },
+
+  async verifyDocumentPin(pin): Promise<VoidResult> {
+    const { data, error } = await requireClient().rpc("verify_document_pin", { p_pin: pin });
+    if (error) return { ok: false, error: error.message };
+    return data === true ? { ok: true } : { ok: false, error: "That PIN is not correct." };
   },
 
   async updateProfile(userId, profile): Promise<AuthResult> {
@@ -178,7 +209,7 @@ export const supabaseAuthClient: AuthClient = {
     const row = await fetchProfile(userId);
     return {
       ok: true,
-      user: toUser(userId, userData.user?.email ?? "", row),
+      user: toUser(userId, userData.user?.email ?? "", row, await fetchDocumentPinState()),
     };
   },
 
@@ -188,6 +219,6 @@ export const supabaseAuthClient: AuthClient = {
     const sessionUser = data.session?.user;
     if (!sessionUser) return null;
     const row = await fetchProfile(sessionUser.id);
-    return toUser(sessionUser.id, sessionUser.email ?? "", row);
+    return toUser(sessionUser.id, sessionUser.email ?? "", row, await fetchDocumentPinState());
   },
 };

@@ -24,12 +24,17 @@ interface SessionContextValue {
   isLoading: boolean;
   user: User | null;
   hasCompletedProfile: boolean;
-  sendEmailOtp: (email: string) => Promise<VoidResult>;
-  verifyEmailOtp: (email: string, token: string) => Promise<AuthResult>;
-  completeMagicLink: (url: string) => Promise<AuthResult>;
+  signUp: (email: string, password: string) => Promise<VoidResult>;
+  signInWithPassword: (email: string, password: string) => Promise<AuthResult>;
+  verifyEmailCode: (email: string, code: string) => Promise<AuthResult>;
+  resendVerificationCode: (email: string) => Promise<VoidResult>;
+  sendPasswordResetCode: (email: string) => Promise<VoidResult>;
+  resetPasswordWithCode: (email: string, code: string, password: string) => Promise<AuthResult>;
   signInWithGoogle: () => Promise<AuthResult>;
   signOut: () => Promise<void>;
   updateProfile: (profile: UserProfile) => Promise<AuthResult>;
+  setDocumentPin: (pin: string) => Promise<VoidResult>;
+  verifyDocumentPin: (pin: string) => Promise<VoidResult>;
 }
 
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
@@ -63,18 +68,26 @@ export function SessionProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
-  const sendEmailOtp = useCallback((email: string) => {
-    return authClient.sendEmailOtp(email);
+  const signUp = useCallback((email: string, password: string) => {
+    return authClient.signUp(email, password);
   }, []);
 
-  const verifyEmailOtp = useCallback(async (email: string, token: string) => {
-    const result = await authClient.verifyEmailOtp(email, token);
+  const signInWithPassword = useCallback(async (email: string, password: string) => {
+    const result = await authClient.signInWithPassword(email, password);
     if (result.ok) setUser(result.user);
     return result;
   }, []);
 
-  const completeMagicLink = useCallback(async (url: string) => {
-    const result = await authClient.completeMagicLink(url);
+  const verifyEmailCode = useCallback(async (email: string, code: string) => {
+    const result = await authClient.verifyEmailCode(email, code);
+    if (result.ok) setUser(result.user);
+    return result;
+  }, []);
+
+  const resendVerificationCode = useCallback((email: string) => authClient.resendVerificationCode(email), []);
+  const sendPasswordResetCode = useCallback((email: string) => authClient.sendPasswordResetCode(email), []);
+  const resetPasswordWithCode = useCallback(async (email: string, code: string, password: string) => {
+    const result = await authClient.resetPasswordWithCode(email, code, password);
     if (result.ok) setUser(result.user);
     return result;
   }, []);
@@ -102,27 +115,40 @@ export function SessionProvider({ children }: PropsWithChildren) {
     [user]
   );
 
+  const setDocumentPin = useCallback((pin: string) => authClient.setDocumentPin(pin), []);
+  const verifyDocumentPin = useCallback((pin: string) => authClient.verifyDocumentPin(pin), []);
+
   const value = useMemo<SessionContextValue>(
     () => ({
       isLoading,
       user,
-      hasCompletedProfile: user?.profile != null,
-      sendEmailOtp,
-      verifyEmailOtp,
-      completeMagicLink,
+      hasCompletedProfile: user?.profile != null && user.hasDocumentPin,
+      signUp,
+      signInWithPassword,
+      verifyEmailCode,
+      resendVerificationCode,
+      sendPasswordResetCode,
+      resetPasswordWithCode,
       signInWithGoogle,
       signOut,
       updateProfile,
+      setDocumentPin,
+      verifyDocumentPin,
     }),
     [
       isLoading,
       user,
-      sendEmailOtp,
-      verifyEmailOtp,
-      completeMagicLink,
+      signUp,
+      signInWithPassword,
+      verifyEmailCode,
+      resendVerificationCode,
+      sendPasswordResetCode,
+      resetPasswordWithCode,
       signInWithGoogle,
       signOut,
       updateProfile,
+      setDocumentPin,
+      verifyDocumentPin,
     ]
   );
 
