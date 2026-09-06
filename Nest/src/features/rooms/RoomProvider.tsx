@@ -14,10 +14,16 @@ import {
   getSupabaseClient,
   isSupabaseConfigured,
 } from "@/lib/supabase";
+import { createRealtimeChannelName } from "@/lib/realtime";
 
 import { RoomError, toRoomError } from "./errors";
 import { inviteValueFromInput } from "./invite";
-import type { JoinResult, RoomInvite, RoomSnapshot } from "./types";
+import type {
+  JoinResult,
+  LeaveNestResult,
+  RoomInvite,
+  RoomSnapshot,
+} from "./types";
 
 type RoomContextValue = {
   activeInvite: RoomInvite | null;
@@ -25,6 +31,7 @@ type RoomContextValue = {
   createRoom: (name: string) => Promise<void>;
   error: string | null;
   joinRoom: (invite: string, confirmLeave?: boolean) => Promise<JoinResult>;
+  leaveRoom: () => Promise<LeaveNestResult>;
   loading: boolean;
   pendingInvite: string | null;
   clearPendingInvite: () => void;
@@ -94,14 +101,14 @@ export function RoomProvider({ children }: PropsWithChildren) {
       setRoom(snapshot);
       setError(null);
 
-      if (snapshot?.membership.role === "admin") {
+      if (snapshot) {
         const { data: inviteData, error: inviteError } = await client.rpc(
           "get_active_nest_invite",
           { p_room_id: snapshot.room.id },
         );
         if (inviteError) {
           // A missing/expired invite must not hide a valid room membership.
-          // Admins can regenerate the invite from the Nest home screen.
+          // Any member can regenerate the invite from the Nest home screen.
           console.warn("[Nest] Could not load the active invite:", inviteError.message);
           setActiveInvite(null);
         } else {
@@ -129,13 +136,23 @@ export function RoomProvider({ children }: PropsWithChildren) {
 
     const client = getSupabaseClient();
     const channel = client
-      .channel(`nest-members-${room.room.id}`)
+      .channel(createRealtimeChannelName(`nest-members-${room.room.id}`))
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "room_members",
+          filter: `room_id=eq.${room.room.id}`,
+        },
+        () => void refresh(),
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "room_invites",
           filter: `room_id=eq.${room.room.id}`,
         },
         () => void refresh(),
@@ -227,6 +244,26 @@ export function RoomProvider({ children }: PropsWithChildren) {
     return invite;
   }, [room]);
 
+  const leaveRoom = useCallback(async () => {
+    requireUser();
+    if (!room) throw new RoomError("You do not belong to a Nest.");
+
+    const client = getSupabaseClient();
+    const { data, error: leaveError } = await client.rpc("leave_nest");
+    if (leaveError) throw toRoomError(leaveError);
+
+    const result = data as LeaveNestResult | null;
+    if (!result || result.status !== "left") {
+      throw new RoomError("The Nest could not be left. Please try again.");
+    }
+
+    setRoom(null);
+    setActiveInvite(null);
+    setPendingInvite(null);
+    setError(null);
+    return result;
+  }, [requireUser, room]);
+
   const removeMember = useCallback(
     async (userId: string) => {
       if (!room) throw new RoomError("You do not belong to a Nest.");
@@ -263,6 +300,7 @@ export function RoomProvider({ children }: PropsWithChildren) {
       createRoom,
       error,
       joinRoom,
+      leaveRoom,
       loading,
       pendingInvite,
       refresh,
@@ -278,6 +316,7 @@ export function RoomProvider({ children }: PropsWithChildren) {
       createRoom,
       error,
       joinRoom,
+      leaveRoom,
       loading,
       pendingInvite,
       refresh,

@@ -11,6 +11,14 @@ export default function RoomSettingsScreen() {
   const [busyMember, setBusyMember] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const nextAdmin = room?.members
+    .filter((member) => member.userId !== user?.id)
+    .sort((a, b) => {
+      const joinedDifference =
+        new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime();
+      return joinedDifference || a.userId.localeCompare(b.userId);
+    })[0];
+
   if (!room || room.membership.role !== "admin") {
     return <View style={styles.center}><Text style={styles.title}>Admin access required</Text><Pressable onPress={() => router.replace("/(room)")} style={styles.primary}><Text style={styles.primaryText}>Back to Nest</Text></Pressable></View>;
   }
@@ -86,7 +94,11 @@ export default function RoomSettingsScreen() {
         })}
       </View>
 
-      {room.members.length === 1 ? <Text style={styles.warning}>You’re the only admin. Invite a roommate and transfer admin access before joining another Nest.</Text> : null}
+      <Text style={styles.warning}>
+        {room.members.length === 1
+          ? "You’re the only member. Leaving from Profile will permanently delete this Nest and its shared data."
+          : `If you leave, ${nextAdmin?.displayName ?? "the next member"} will automatically become admin and current invitations will be revoked.`}
+      </Text>
     </ScrollView>
   );
 }
