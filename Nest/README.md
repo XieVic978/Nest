@@ -1,3 +1,66 @@
+# Nest
+
+## Page file map
+
+Each screen is intentionally bare so one teammate can build it without touching the others.
+
+| Page | File |
+| --- | --- |
+| Login | `src/app/(auth)/sign-in.tsx` |
+| Profile setup | `src/app/profile-setup.tsx` |
+| Create / join a home | `src/app/create-join.tsx` |
+| Nest — center tab / announcements home | `src/app/(room)/index.tsx` |
+| Payments / what is owed | `src/app/(room)/payments.tsx` |
+| Chores | `src/app/(room)/chores.tsx` |
+| Groceries | `src/app/(room)/groceries.tsx` |
+| Documents and 4-digit PIN entry | `src/app/(room)/documents.tsx` |
+| Profile — outside the bottom tabs | `src/app/profile.tsx` |
+| Authenticated bottom-tab navigation | `src/app/(room)/_layout.tsx` |
+| App-level navigation | `src/app/_layout.tsx` |
+
+Protected routes send signed-out users to Login and new users to Profile Setup.
+After completing their profile, users without a room see Create / Join, while
+room members enter the authenticated tab area. The tab order is Chores,
+Payments, Nest, Groceries, Documents.
+
+## Nest room setup
+
+The room flow uses the authenticated Supabase session. Add these values to a
+local `.env.local` file (see `.env.example`):
+
+```bash
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+```
+
+Apply the migrations in `supabase/migrations` to the same Supabase project used
+by authentication. They create profiles, rooms, memberships, 10-minute
+invitations, transactional RPCs, and Row Level Security policies.
+
+The authentication flow stores the display name in `profiles.full_name`, with
+the authenticated user ID as `profiles.id`. Email sign-in links return through
+`auth/callback`; first-time users are then routed to Profile Setup. In Supabase
+Authentication > URL Configuration, allow `nest://**` for development/standalone
+builds and temporarily allow `exp://**` when testing callbacks in Expo Go. A
+pending `nest://join/<token>` invitation is kept through sign-in and profile
+setup.
+
+All future shared-data tables must have a non-null `room_id`. Their Row Level
+Security policies should authorize access with
+`private.is_nest_member(room_id)` so filtering cannot be bypassed by a modified
+client.
+
+## Run the app
+
+```bash
+npm install
+npm start
+```
+
+Scan the QR code with Expo Go. To test in a browser instead, press `w` after Expo starts.
+
+---
+
 # Welcome to your Expo app 👋
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
