@@ -50,7 +50,7 @@ export default function VerifyEmail() {
       {formError ? <Text style={styles.error}>{formError}</Text> : null}
       {notice ? <Text style={styles.notice}>{notice}</Text> : null}
       <PrimaryButton title={isRecovery ? "Reset password" : "Verify email"} onPress={handleVerify} loading={submitting} />
-      <Pressable style={styles.resend} onPress={handleResend} disabled={submitting}><Text style={styles.link}>Send a new code</Text></Pressable>
+      {!isRecovery ? <Pressable style={styles.resend} onPress={handleResend} disabled={submitting}><Text style={styles.link}>Send a new code</Text></Pressable> : null}
       <Pressable style={styles.back} onPress={() => router.replace("/(auth)/sign-in")}><Text style={styles.backText}>Use a different email</Text></Pressable>
     </FormScreen>
   );
