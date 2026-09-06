@@ -117,6 +117,15 @@ function ChoresContent({ members, roomId, userId }: { members: RoomMember[]; roo
       Alert.alert("Couldn’t complete chore", errorMessage(caught));
     }
   };
+  const confirmComplete = (chore: Chore) => {
+    const performComplete = () => void completeChore(chore);
+    const message = `Mark “${chore.title}” complete for everyone in this Nest?`;
+    if (Platform.OS === "web") { if (globalThis.confirm(message)) performComplete(); return; }
+    Alert.alert("Mark chore complete?", message, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Mark complete", onPress: performComplete },
+    ]);
+  };
 
   const deleteChore = async (id: string) => {
     try {
@@ -154,11 +163,11 @@ function ChoresContent({ members, roomId, userId }: { members: RoomMember[]; roo
       <View style={styles.formActions}><Pressable onPress={() => setShowForm(false)} style={styles.cancelButton}><Text style={styles.cancelText}>Cancel</Text></Pressable><Pressable disabled={saving} onPress={() => void saveChore()} style={styles.saveButton}>{saving ? <ActivityIndicator color="white" /> : <Text style={styles.saveText}>{editingId ? "Save changes" : "Create chore"}</Text>}</Pressable></View>
     </View> : null}
     <Section title="Active" count={filtered.filter((chore) => displayedStatus(chore) === "Active").length} />
-    {filtered.filter((chore) => displayedStatus(chore) === "Active").map((chore) => <ChoreCard key={chore.id} chore={chore} onComplete={completeChore} onEdit={openForm} onDelete={confirmDelete} />)}
+    {filtered.filter((chore) => displayedStatus(chore) === "Active").map((chore) => <ChoreCard key={chore.id} chore={chore} onComplete={confirmComplete} onEdit={openForm} onDelete={confirmDelete} />)}
     <Section title="Upcoming" count={filtered.filter((chore) => displayedStatus(chore) === "Upcoming").length} />
-    {filtered.filter((chore) => displayedStatus(chore) === "Upcoming").map((chore) => <ChoreCard key={chore.id} chore={chore} onComplete={completeChore} onEdit={openForm} onDelete={confirmDelete} />)}
+    {filtered.filter((chore) => displayedStatus(chore) === "Upcoming").map((chore) => <ChoreCard key={chore.id} chore={chore} onComplete={confirmComplete} onEdit={openForm} onDelete={confirmDelete} />)}
     <Section title="Completed" count={filtered.filter((chore) => displayedStatus(chore) === "Completed").length} />
-    {filtered.filter((chore) => displayedStatus(chore) === "Completed").map((chore) => <ChoreCard key={chore.id} chore={chore} onComplete={completeChore} onEdit={openForm} onDelete={confirmDelete} />)}
+    {filtered.filter((chore) => displayedStatus(chore) === "Completed").map((chore) => <ChoreCard key={chore.id} chore={chore} onComplete={confirmComplete} onEdit={openForm} onDelete={confirmDelete} />)}
     {!loading && !filtered.length ? <View style={styles.empty}><Text style={styles.emptyTitle}>No chores here yet</Text><Text style={styles.emptyText}>Try changing filters or create the first chore for your home.</Text><Pressable onPress={() => openForm()} style={styles.emptyButton}><Text style={styles.emptyButtonText}>Create first chore</Text></Pressable></View> : null}
   </ScrollView></View></TouchableWithoutFeedback>;
 }
