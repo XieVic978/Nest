@@ -22,7 +22,7 @@ export default function RoomLayout() {
     <Tabs.Screen name="payments" options={tabOptions("Payments")} />
     <Tabs.Screen name="index" options={tabOptions("Nest")} />
     <Tabs.Screen name="groceries" options={tabOptions("Groceries")} />
-    <Tabs.Screen name="documents" options={tabOptions("Documents")} />
+    <Tabs.Screen name="documents" options={tabOptions("Notes")} />
   </Tabs>;
 }
 
