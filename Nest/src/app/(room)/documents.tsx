@@ -54,9 +54,9 @@ export default function NotesScreen() {
     return () => clearTimeout(timer);
   }, [draft, edited, saveContent, unlocked]);
 
-  async function unlock() {
+  async function unlock(pinToVerify = pin) {
     Keyboard.dismiss(); setChecking(true); setError(null);
-    const result = await verifyDocumentPin(pin);
+    const result = await verifyDocumentPin(pinToVerify);
     setChecking(false);
     if (!result.ok) return setError(result.error);
     setPin(""); setUnlocked(true);
@@ -67,6 +67,12 @@ export default function NotesScreen() {
     await Clipboard.setStringAsync(nestJoinCode);
     setCodeCopied(true);
     setTimeout(() => setCodeCopied(false), 2_000);
+  }
+
+  function handlePinChange(value: string) {
+    setPin(value);
+    setError(null);
+    if (value.length === PIN_LENGTH && !checking) void unlock(value);
   }
 
   function openReset() { Keyboard.dismiss(); setPassword(""); setNewPin(""); setConfirmPin(""); setResetError(null); setResetVisible(true); }
@@ -87,9 +93,8 @@ export default function NotesScreen() {
     <Text style={styles.title}>Notes</Text>
     {!unlocked ? <>
       <Text style={styles.body}>Enter your four-digit Nest PIN to open your shared household note.</Text>
-      <TextInput ref={pinInput} accessibilityLabel="Four digit PIN" autoFocus keyboardType="number-pad" maxLength={PIN_LENGTH} onChangeText={(value) => { setPin(value); setError(null); }} onSubmitEditing={() => void unlock()} placeholder="4-digit PIN" secureTextEntry style={styles.input} textContentType="oneTimeCode" value={pin} />
-      <Pressable accessibilityRole="button" onPress={Keyboard.dismiss} style={styles.dismiss}><Text style={styles.dismissText}>Done entering PIN</Text></Pressable>
-      <Pressable accessibilityRole="button" disabled={pin.length !== PIN_LENGTH || checking} onPress={() => void unlock()} style={[styles.button, (pin.length !== PIN_LENGTH || checking) && styles.disabled]}><Text style={styles.buttonText}>{checking ? "Checking…" : "Unlock notes"}</Text></Pressable>
+      <TextInput ref={pinInput} accessibilityLabel="Four digit PIN" autoFocus keyboardType="number-pad" maxLength={PIN_LENGTH} onChangeText={handlePinChange} placeholder="4-digit PIN" secureTextEntry style={styles.input} textContentType="oneTimeCode" value={pin} />
+      {checking ? <Text style={styles.checking}>Checking PIN…</Text> : <Text style={styles.pinHint}>Notes open automatically after the fourth digit.</Text>}
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}{notice ? <Text style={styles.notice}>{notice}</Text> : null}
       <Pressable accessibilityRole="button" onPress={openReset} style={styles.resetLink}><Text style={styles.resetText}>Forgot your PIN? Reset it</Text></Pressable>
     </> : <>
@@ -106,5 +111,5 @@ export default function NotesScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#F7F5EF", padding: 24, paddingTop: 72 }, title: { color: "#18251F", fontSize: 30, fontWeight: "800", marginBottom: 12 }, body: { color: "#64716B", lineHeight: 21, marginBottom: 20 }, input: { backgroundColor: "#FFFFFF", borderColor: "#E4E8E3", borderRadius: 12, borderWidth: 1, fontSize: 16, padding: 15 }, button: { alignItems: "center", backgroundColor: "#28634E", borderRadius: 12, marginTop: 12, padding: 15 }, buttonText: { color: "#FFFFFF", fontWeight: "800" }, disabled: { opacity: 0.5 }, error: { color: "#B6453C", fontWeight: "600", marginTop: 12 }, notice: { color: "#28634E", fontWeight: "600", marginTop: 12 }, dismiss: { alignSelf: "flex-end", paddingHorizontal: 2, paddingVertical: 10 }, dismissText: { color: "#28634E", fontSize: 13, fontWeight: "800" }, resetLink: { alignSelf: "flex-start", marginTop: 16 }, resetText: { color: "#28634E", fontSize: 14, fontWeight: "800" }, codeLabel: { color: "#64716B", fontSize: 11, fontWeight: "800", letterSpacing: 1, marginBottom: 7 }, codeCard: { alignItems: "center", backgroundColor: "#FFFFFF", borderColor: "#B7D7C4", borderRadius: 12, borderWidth: 1, flexDirection: "row", justifyContent: "space-between", padding: 16 }, codePressed: { backgroundColor: "#E3F2E8", transform: [{ scale: 0.98 }] }, codeText: { color: "#18251F", fontSize: 22, fontWeight: "900", letterSpacing: 2 }, copyText: { color: "#28634E", fontSize: 10, fontWeight: "800", marginTop: 5 }, copyIcon: { color: "#28634E", fontSize: 24, fontWeight: "800" }, noteHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 10, marginTop: 24 }, noteTitle: { color: "#18251F", fontSize: 20, fontWeight: "900" }, noteSubtitle: { color: "#64716B", fontSize: 12, marginTop: 3 }, saveState: { color: "#28634E", fontSize: 12, fontWeight: "800" }, noteInput: { backgroundColor: "#FFFFFF", borderColor: "#E4E8E3", borderRadius: 14, borderWidth: 1, color: "#18251F", flex: 1, fontSize: 17, lineHeight: 25, minHeight: 260, padding: 16 }, modalBackdrop: { backgroundColor: "rgba(12, 25, 18, 0.48)", flex: 1, justifyContent: "flex-end" }, modalCard: { backgroundColor: "#F7F5EF", borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "88%", padding: 24 }, modalHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 10 }, modalTitle: { color: "#18251F", fontSize: 22, fontWeight: "900" }, close: { color: "#28634E", fontWeight: "900" }, label: { color: "#64716B", fontSize: 11, fontWeight: "800", letterSpacing: 1, marginBottom: 7, marginTop: 14 },
+  screen: { flex: 1, backgroundColor: "#F7F5EF", padding: 24, paddingTop: 72 }, title: { color: "#18251F", fontSize: 30, fontWeight: "800", marginBottom: 12 }, body: { color: "#64716B", lineHeight: 21, marginBottom: 20 }, input: { backgroundColor: "#FFFFFF", borderColor: "#E4E8E3", borderRadius: 12, borderWidth: 1, fontSize: 16, padding: 15 }, button: { alignItems: "center", backgroundColor: "#28634E", borderRadius: 12, marginTop: 12, padding: 15 }, buttonText: { color: "#FFFFFF", fontWeight: "800" }, disabled: { opacity: 0.5 }, error: { color: "#B6453C", fontWeight: "600", marginTop: 12 }, notice: { color: "#28634E", fontWeight: "600", marginTop: 12 }, checking: { color: "#28634E", fontWeight: "800", marginTop: 12 }, pinHint: { color: "#758079", fontSize: 13, marginTop: 12 }, dismiss: { alignSelf: "flex-end", paddingHorizontal: 2, paddingVertical: 10 }, dismissText: { color: "#28634E", fontSize: 13, fontWeight: "800" }, resetLink: { alignSelf: "flex-start", marginTop: 16 }, resetText: { color: "#28634E", fontSize: 14, fontWeight: "800" }, codeLabel: { color: "#64716B", fontSize: 11, fontWeight: "800", letterSpacing: 1, marginBottom: 7 }, codeCard: { alignItems: "center", backgroundColor: "#FFFFFF", borderColor: "#B7D7C4", borderRadius: 12, borderWidth: 1, flexDirection: "row", justifyContent: "space-between", padding: 16 }, codePressed: { backgroundColor: "#E3F2E8", transform: [{ scale: 0.98 }] }, codeText: { color: "#18251F", fontSize: 22, fontWeight: "900", letterSpacing: 2 }, copyText: { color: "#28634E", fontSize: 10, fontWeight: "800", marginTop: 5 }, copyIcon: { color: "#28634E", fontSize: 24, fontWeight: "800" }, noteHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 10, marginTop: 24 }, noteTitle: { color: "#18251F", fontSize: 20, fontWeight: "900" }, noteSubtitle: { color: "#64716B", fontSize: 12, marginTop: 3 }, saveState: { color: "#28634E", fontSize: 12, fontWeight: "800" }, noteInput: { backgroundColor: "#FFFFFF", borderColor: "#E4E8E3", borderRadius: 14, borderWidth: 1, color: "#18251F", flex: 1, fontSize: 17, lineHeight: 25, minHeight: 260, padding: 16 }, modalBackdrop: { backgroundColor: "rgba(12, 25, 18, 0.48)", flex: 1, justifyContent: "flex-end" }, modalCard: { backgroundColor: "#F7F5EF", borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "88%", padding: 24 }, modalHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 10 }, modalTitle: { color: "#18251F", fontSize: 22, fontWeight: "900" }, close: { color: "#28634E", fontWeight: "900" }, label: { color: "#64716B", fontSize: 11, fontWeight: "800", letterSpacing: 1, marginBottom: 7, marginTop: 14 },
 });
