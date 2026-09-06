@@ -1,16 +1,39 @@
 // Supabase-backed implementation of AuthClient.
 //
-// Auth uses email/password with one-time verification codes. Profile data lives
-// in a `profiles` table keyed by the auth user id. See the setup checklist for
-// the SQL that creates that table and its row-level-security policies.
+// Auth supports email/password verification flows and Google OAuth. Profile
+// data lives in a `profiles` table keyed by the auth user id.
 //
 // This implements the exact same interface as the mock, so switching backends
 // is a one-line change in ./index.ts.
+
+import { makeRedirectUri } from "expo-auth-session";
+import * as QueryParams from "expo-auth-session/build/QueryParams";
+import * as WebBrowser from "expo-web-browser";
 
 import { supabase } from "./supabase";
 import { AuthClient } from "./authClient";
 import { AuthResult, User, UserProfile, VoidResult } from "./types";
 import { normalizeEmail } from "./validation";
+
+WebBrowser.maybeCompleteAuthSession();
+
+const oauthRedirectTo = makeRedirectUri();
+
+async function createSessionFromUrl(url: string) {
+  const client = requireClient();
+  const { params, errorCode } = QueryParams.getQueryParams(url);
+  if (errorCode) throw new Error(errorCode);
+
+  const { access_token, refresh_token } = params;
+  if (!access_token || !refresh_token) return null;
+
+  const { data, error } = await client.auth.setSession({
+    access_token,
+    refresh_token,
+  });
+  if (error) throw error;
+  return data.session;
+}
 
 // Shape of a row in the `profiles` table.
 interface ProfileRow {
@@ -162,13 +185,45 @@ export const supabaseAuthClient: AuthClient = {
   },
 
   async signInWithGoogle(): Promise<AuthResult> {
-    // Google OAuth on native needs additional setup (Google Cloud OAuth client,
-    // redirect handling via expo-auth-session/expo-web-browser). Wired in a
-    // follow-up step; fail clearly until then.
-    return {
-      ok: false,
-      error: "Google sign-in isn't set up yet. Use email for now.",
-    };
+    const client = requireClient();
+    try {
+      const { data, error } = await client.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: oauthRedirectTo,
+          skipBrowserRedirect: true,
+        },
+      });
+      if (error) return { ok: false, error: error.message };
+      if (!data?.url) {
+        return { ok: false, error: "Could not start Google sign-in." };
+      }
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, oauthRedirectTo);
+      if (result.type !== "success") {
+        return { ok: false, error: "Google sign-in was cancelled." };
+      }
+
+      const session = await createSessionFromUrl(result.url);
+      if (!session?.user) {
+        return { ok: false, error: "Google sign-in did not complete." };
+      }
+
+      const row = await fetchProfile(session.user.id);
+      return {
+        ok: true,
+        user: toUser(
+          session.user.id,
+          session.user.email ?? "",
+          row,
+          await fetchDocumentPinState(),
+        ),
+      };
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Google sign-in failed.";
+      console.warn("[Nest] Google sign-in error:", message);
+      return { ok: false, error: message };
+    }
   },
 
   async signOut(): Promise<void> {
