@@ -118,8 +118,15 @@ export function useAnnouncements(roomId: string, userId: string) {
 
   const remove = useCallback(async (id: string) => {
     const client = getSupabaseClient();
-    const { error: deleteError } = await client.from("announcements").delete().eq("id", id).eq("room_id", roomId);
+    const { data, error: deleteError } = await client
+      .from("announcements")
+      .delete()
+      .eq("id", id)
+      .eq("room_id", roomId)
+      .select("id")
+      .maybeSingle();
     if (deleteError) throw deleteError;
+    if (!data) throw new Error("The announcement was not deleted. Only its author or a Nest admin can delete it.");
     await refresh();
   }, [refresh, roomId]);
 

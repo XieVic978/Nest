@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 
 import { SharedCalendar } from "@/components/shared-calendar";
@@ -48,7 +48,20 @@ function HomeContent({ activeInvite, refreshRoom, regenerateInvite, room, userId
 
   const showError = (title: string, caught: unknown) => Alert.alert(title, typeof caught === "object" && caught && "message" in caught ? String(caught.message) : "Please try again.");
   const openRelated = async (item: Announcement) => { try { await markRead(item.id); } catch (caught) { showError("Couldn’t mark announcement read", caught); } if (item.target === "chores") router.push("/(room)/chores"); if (item.target === "payments") router.push("/(room)/payments"); if (item.target === "groceries") router.push("/(room)/groceries"); };
-  const confirmDelete = (item: Announcement) => Alert.alert("Delete announcement?", `Delete “${item.title}” for everyone in this Nest?`, [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => void remove(item.id).catch((caught) => showError("Couldn’t delete announcement", caught)) }]);
+  const confirmDelete = (item: Announcement) => {
+    const message = `Delete “${item.title}” for everyone in this Nest?`;
+    const performDelete = () => void remove(item.id).catch((caught) => showError("Couldn’t delete announcement", caught));
+
+    if (Platform.OS === "web") {
+      if (globalThis.confirm(message)) performDelete();
+      return;
+    }
+
+    Alert.alert("Delete announcement?", message, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: performDelete },
+    ]);
+  };
   const publish = async (item: { title: string; pinned: boolean }) => { try { await publishAnnouncement(item); setFormVisible(false); return true; } catch (caught) { showError("Couldn’t publish announcement", caught); return false; } };
   const addCalendarAnnouncement = (title: string) => { void publishAnnouncement({ title, automated: true, target: "calendar" }).catch((caught) => showError("Couldn’t share calendar update", caught)); };
   const refreshAll = async () => { await Promise.all([refreshRoom(), refresh()]); };

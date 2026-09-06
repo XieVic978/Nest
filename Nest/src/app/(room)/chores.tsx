@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { useRoom } from "@/features/rooms/RoomProvider";
 import type { RoomMember } from "@/features/rooms/types";
@@ -125,7 +125,20 @@ function ChoresContent({ members, roomId, userId }: { members: RoomMember[]; roo
       Alert.alert("Couldn’t delete chore", errorMessage(caught));
     }
   };
-  const confirmDelete = (chore: Chore) => Alert.alert("Delete chore?", `Delete “${chore.title}”? This cannot be undone.`, [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => void deleteChore(chore.id) }]);
+  const confirmDelete = (chore: Chore) => {
+    const message = `Delete “${chore.title}”? This cannot be undone.`;
+    const performDelete = () => void deleteChore(chore.id);
+
+    if (Platform.OS === "web") {
+      if (globalThis.confirm(message)) performDelete();
+      return;
+    }
+
+    Alert.alert("Delete chore?", message, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: performDelete },
+    ]);
+  };
   const toggleRotationMember = (member: string) => setRotation((current) => current.includes(member) ? current.filter((item) => item !== member) : [...current, member]);
 
   return <View style={styles.screen}><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void refresh()} tintColor="#28634E" />}>

@@ -65,12 +65,11 @@ invite access isolated to the matching Nest and broadcasts regenerated invites
 to the other members through Supabase Realtime.
 
 The authentication flow stores the display name in `profiles.full_name`, with
-the authenticated user ID as `profiles.id`. Email sign-in links return through
-`auth/callback`; first-time users are then routed to Profile Setup. In Supabase
-Authentication > URL Configuration, allow `nest://**` for development/standalone
-builds and temporarily allow `exp://**` when testing callbacks in Expo Go. A
-pending `nest://join/<token>` invitation is kept through sign-in and profile
-setup.
+the authenticated user ID as `profiles.id`. Email sign-in uses a six-digit OTP;
+first-time users are then routed to Profile Setup. In Supabase Authentication >
+Email Templates > Magic Link, include `{{ .Token }}` in the message instead of
+`{{ .ConfirmationURL }}` so Supabase sends a code instead of a link. A pending
+Nest invitation is kept through sign-in and profile setup.
 
 All future shared-data tables must have a non-null `room_id`. Their Row Level
 Security policies should authorize access with

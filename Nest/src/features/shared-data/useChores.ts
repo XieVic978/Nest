@@ -115,8 +115,15 @@ export function useChores(roomId: string, userId: string) {
 
   const remove = useCallback(async (id: string) => {
     const client = getSupabaseClient();
-    const { error: deleteError } = await client.from("chores").delete().eq("id", id).eq("room_id", roomId);
+    const { data, error: deleteError } = await client
+      .from("chores")
+      .delete()
+      .eq("id", id)
+      .eq("room_id", roomId)
+      .select("id")
+      .maybeSingle();
     if (deleteError) throw deleteError;
+    if (!data) throw new Error("The chore was not deleted. It may already be gone, or you may not have permission.");
     await refresh();
   }, [refresh, roomId]);
 

@@ -24,7 +24,8 @@ interface SessionContextValue {
   isLoading: boolean;
   user: User | null;
   hasCompletedProfile: boolean;
-  sendMagicLink: (email: string) => Promise<VoidResult>;
+  sendEmailOtp: (email: string) => Promise<VoidResult>;
+  verifyEmailOtp: (email: string, token: string) => Promise<AuthResult>;
   completeMagicLink: (url: string) => Promise<AuthResult>;
   signInWithGoogle: () => Promise<AuthResult>;
   signOut: () => Promise<void>;
@@ -62,8 +63,14 @@ export function SessionProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
-  const sendMagicLink = useCallback((email: string) => {
-    return authClient.sendMagicLink(email);
+  const sendEmailOtp = useCallback((email: string) => {
+    return authClient.sendEmailOtp(email);
+  }, []);
+
+  const verifyEmailOtp = useCallback(async (email: string, token: string) => {
+    const result = await authClient.verifyEmailOtp(email, token);
+    if (result.ok) setUser(result.user);
+    return result;
   }, []);
 
   const completeMagicLink = useCallback(async (url: string) => {
@@ -100,7 +107,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
       isLoading,
       user,
       hasCompletedProfile: user?.profile != null,
-      sendMagicLink,
+      sendEmailOtp,
+      verifyEmailOtp,
       completeMagicLink,
       signInWithGoogle,
       signOut,
@@ -109,7 +117,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
     [
       isLoading,
       user,
-      sendMagicLink,
+      sendEmailOtp,
+      verifyEmailOtp,
       completeMagicLink,
       signInWithGoogle,
       signOut,

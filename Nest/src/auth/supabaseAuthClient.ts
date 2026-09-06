@@ -1,13 +1,11 @@
 // Supabase-backed implementation of AuthClient.
 //
-// Auth uses a one-time link emailed to the user. Profile data lives
+// Auth uses a six-digit one-time code emailed to the user. Profile data lives
 // in a `profiles` table keyed by the auth user id. See the setup checklist for
 // the SQL that creates that table and its row-level-security policies.
 //
 // This implements the exact same interface as the mock, so switching backends
 // is a one-line change in ./index.ts.
-
-import * as Linking from "expo-linking";
 
 import { supabase } from "./supabase";
 import { AuthClient } from "./authClient";
@@ -65,7 +63,7 @@ async function fetchProfile(userId: string): Promise<ProfileRow | null> {
 }
 
 export const supabaseAuthClient: AuthClient = {
-  async sendMagicLink(email): Promise<VoidResult> {
+  async sendEmailOtp(email): Promise<VoidResult> {
     const client = requireClient();
     const { error } = await client.auth.signInWithOtp({
       email: normalizeEmail(email),
@@ -73,11 +71,31 @@ export const supabaseAuthClient: AuthClient = {
       // the same flow serves both sign-in and sign-up.
       options: {
         shouldCreateUser: true,
-        emailRedirectTo: Linking.createURL("auth/callback"),
       },
     });
     if (error) return { ok: false, error: error.message };
     return { ok: true };
+  },
+
+  async verifyEmailOtp(email, token): Promise<AuthResult> {
+    const client = requireClient();
+    const { data, error } = await client.auth.verifyOtp({
+      email: normalizeEmail(email),
+      token: token.trim(),
+      type: "email",
+    });
+    if (error || !data.user) {
+      return {
+        ok: false,
+        error: error?.message ?? "This code could not be verified.",
+      };
+    }
+
+    const row = await fetchProfile(data.user.id);
+    return {
+      ok: true,
+      user: toUser(data.user.id, data.user.email ?? "", row),
+    };
   },
 
   async completeMagicLink(url): Promise<AuthResult> {

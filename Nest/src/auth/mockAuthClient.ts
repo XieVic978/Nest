@@ -19,6 +19,7 @@ interface MockRecord {
 }
 
 const users = new Map<string, MockRecord>(); // key: normalized email
+const pendingOtps = new Map<string, string>(); // key: normalized email
 let currentUserId: string | null = null;
 
 function generateId(): string {
@@ -67,12 +68,22 @@ function signInOrCreate(email: string): MockRecord {
 }
 
 export const mockAuthClient: AuthClient = {
-  async sendMagicLink(email): Promise<VoidResult> {
+  async sendEmailOtp(email): Promise<VoidResult> {
     const key = normalizeEmail(email);
-    console.log(
-      `[Nest magic link] nest://auth/callback?mock_email=${encodeURIComponent(key)}`
-    );
+    const token = "123456";
+    pendingOtps.set(key, token);
+    console.log(`[Nest email OTP] ${token} for ${key}`);
     return { ok: true };
+  },
+
+  async verifyEmailOtp(email, token): Promise<AuthResult> {
+    const key = normalizeEmail(email);
+    if (pendingOtps.get(key) !== token.trim()) {
+      return { ok: false, error: "That code is invalid or has expired." };
+    }
+    pendingOtps.delete(key);
+    const record = signInOrCreate(key);
+    return { ok: true, user: toUser(record) };
   },
 
   async completeMagicLink(url): Promise<AuthResult> {

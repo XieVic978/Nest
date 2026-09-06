@@ -6,12 +6,13 @@
 // `supabaseAuthClient` that implements this interface and export it from
 // ./index.ts; no screen or context code needs to change.
 //
-// Authentication uses a one-time email sign-in link. There are no passwords:
-// the same flow signs in returning users and creates accounts for new emails
-// when the link is opened.
+// Authentication uses a six-digit email OTP. There are no passwords: the same
+// flow signs in returning users and creates accounts for new emails when the
+// code is verified.
 //
 // Mapping notes for the future Supabase implementation:
-//   sendMagicLink         -> supabase.auth.signInWithOtp({ email, options })
+//   sendEmailOtp          -> supabase.auth.signInWithOtp({ email, options })
+//   verifyEmailOtp        -> supabase.auth.verifyOtp({ email, token, type: "email" })
 //   completeMagicLink     -> supabase.auth.setSession({ access_token, refresh_token })
 //   signInWithGoogle      -> supabase.auth.signInWithOAuth({ provider: "google" })
 //   signOut               -> supabase.auth.signOut()
@@ -21,8 +22,11 @@
 import { AuthResult, User, UserProfile, VoidResult } from "./types";
 
 export interface AuthClient {
-  /** Send a one-time sign-in link to the given email address. */
-  sendMagicLink(email: string): Promise<VoidResult>;
+  /** Send a six-digit one-time sign-in code to the given email address. */
+  sendEmailOtp(email: string): Promise<VoidResult>;
+
+  /** Verify an emailed code and establish the authenticated session. */
+  verifyEmailOtp(email: string, token: string): Promise<AuthResult>;
 
   /** Complete sign-in from the URL that opened the app. */
   completeMagicLink(url: string): Promise<AuthResult>;
