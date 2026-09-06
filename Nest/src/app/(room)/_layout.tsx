@@ -23,6 +23,8 @@ export default function RoomLayout() {
     <Tabs.Screen name="index" options={tabOptions("Nest")} />
     <Tabs.Screen name="groceries" options={tabOptions("Groceries")} />
     <Tabs.Screen name="documents" options={tabOptions("Notes")} />
+    <Tabs.Screen name="upload-grocery" options={{ href: null }} />
+    <Tabs.Screen name="review-grocery" options={{ href: null }} />
   </Tabs>;
 }
 
