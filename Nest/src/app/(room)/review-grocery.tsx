@@ -9,8 +9,9 @@ export default function ReviewGroceryScreen() {
   const { date, imagePath, items, photoName, photoUri, title } = useLocalSearchParams<{ date?: string; imagePath?: string; items?: string; photoName?: string; photoUri?: string; title?: string }>();
   const { createReceiptExpense } = useExpenses(room?.room.id ?? "");
   if (!room) return null;
-  const save = async (input: ReceiptExpenseInput) => { await createReceiptExpense(input); router.replace("/(room)/payments"); return true; };
+  const close = () => router.replace("/(room)/payments");
+  const save = async (input: ReceiptExpenseInput) => { await createReceiptExpense(input); return true; };
   let scannedItems: { name: string; amount: number }[] = [];
   try { scannedItems = items ? JSON.parse(items) : []; } catch { scannedItems = []; }
-  return <ReceiptForm visible members={room.members} photoName={photoName} photoUri={photoUri} imagePath={imagePath} initialDate={date} initialItems={scannedItems} initialTitle={title} onClose={() => router.back()} onSave={save} />;
+  return <ReceiptForm visible members={room.members} photoName={photoName} photoUri={photoUri} imagePath={imagePath} initialDate={date} initialItems={scannedItems} initialTitle={title} onClose={close} onSave={save} />;
 }
