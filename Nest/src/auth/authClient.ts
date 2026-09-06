@@ -34,6 +34,9 @@ export interface AuthClient {
    */
   updateProfile(userId: string, profile: UserProfile): Promise<AuthResult>;
 
+  setDocumentPin(pin: string): Promise<VoidResult>;
+  verifyDocumentPin(pin: string): Promise<VoidResult>;
+
   /** Return the currently authenticated user, or null. */
   getCurrentUser(): Promise<User | null>;
 }

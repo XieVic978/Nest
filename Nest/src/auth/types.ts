@@ -13,6 +13,8 @@ export interface User {
   email: string;
   // A completed profile is required before the app unlocks.
   profile: UserProfile | null;
+  // Only a boolean is exposed. The PIN hash never leaves the database.
+  hasDocumentPin: boolean;
 }
 
 // Result shapes returned by the auth client so callers can surface clear error

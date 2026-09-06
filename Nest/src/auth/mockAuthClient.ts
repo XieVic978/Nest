@@ -16,6 +16,7 @@ interface MockRecord {
   phone: string | null;
   venmo: string | null;
   zelle: string | null;
+  documentsPin: string | null;
 }
 
 const users = new Map<string, MockRecord>(); // key: normalized email
@@ -37,7 +38,7 @@ function toUser(record: MockRecord): User {
         ...(record.zelle ? { zelle: record.zelle } : {}),
       }
     : null;
-  return { id: record.id, email: record.email, profile };
+  return { id: record.id, email: record.email, profile, hasDocumentPin: record.documentsPin != null };
 }
 
 function findById(id: string): MockRecord | undefined {
@@ -60,6 +61,7 @@ function signInOrCreate(email: string): MockRecord {
       phone: null,
       venmo: null,
       zelle: null,
+      documentsPin: null,
     };
     users.set(key, record);
   }
@@ -145,6 +147,19 @@ export const mockAuthClient: AuthClient = {
     record.venmo = clean(profile.venmo);
     record.zelle = clean(profile.zelle);
     return { ok: true, user: toUser(record) };
+  },
+
+  async setDocumentPin(pin): Promise<VoidResult> {
+    const record = currentUserId ? findById(currentUserId) : undefined;
+    if (!record) return { ok: false, error: "You are not signed in." };
+    record.documentsPin = pin;
+    return { ok: true };
+  },
+
+  async verifyDocumentPin(pin): Promise<VoidResult> {
+    const record = currentUserId ? findById(currentUserId) : undefined;
+    if (!record || record.documentsPin !== pin) return { ok: false, error: "That PIN is not correct." };
+    return { ok: true };
   },
 
   async getCurrentUser() {
