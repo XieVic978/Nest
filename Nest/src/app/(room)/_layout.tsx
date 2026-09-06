@@ -23,6 +23,10 @@ export default function RoomLayout() {
     <Tabs.Screen name="index" options={tabOptions("Nest")} />
     <Tabs.Screen name="groceries" options={tabOptions("Groceries")} />
     <Tabs.Screen name="documents" options={tabOptions("Notes")} />
+    {/* Receipt flow screens: reachable via router.push but hidden from the tab bar. */}
+    <Tabs.Screen name="scan-receipt" options={{ href: null }} />
+    <Tabs.Screen name="review-receipt" options={{ href: null }} />
+    <Tabs.Screen name="expense/[id]" options={{ href: null }} />
   </Tabs>;
 }
 

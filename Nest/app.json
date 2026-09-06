@@ -32,6 +32,12 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Nest uses the camera to scan receipts for splitting expenses."
+        }
       ]
     ],
     "experiments": {
