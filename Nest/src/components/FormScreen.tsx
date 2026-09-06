@@ -11,6 +11,7 @@ import {
   type ViewProps,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardDismissView } from "@/components/KeyboardDismissView";
 
 interface FormScreenProps extends ViewProps {
   title: string;
@@ -24,7 +25,7 @@ export function FormScreen({
   ...rest
 }: FormScreenProps) {
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+    <KeyboardDismissView><SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -41,7 +42,7 @@ export function FormScreen({
           {children}
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </SafeAreaView></KeyboardDismissView>
   );
 }
 

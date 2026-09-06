@@ -11,6 +11,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 
@@ -110,7 +111,7 @@ export default function DocumentsScreen() {
   }
 
   return (
-    <View style={styles.screen}>
+    <TouchableWithoutFeedback accessible={false} onPress={Keyboard.dismiss}><View style={styles.screen}>
       <Text style={styles.title}>Notes</Text>
       {!unlocked ? (
         <>
@@ -151,7 +152,7 @@ export default function DocumentsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </View>
+    </View></TouchableWithoutFeedback>
   );
 }
 

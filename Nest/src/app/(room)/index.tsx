@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Keyboard, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableWithoutFeedback, View } from "react-native";
 import { router } from "expo-router";
 
 import { SharedCalendar } from "@/components/shared-calendar";
@@ -65,7 +65,7 @@ function HomeContent({ refreshRoom, room, userId }: { refreshRoom: () => Promise
   const addCalendarAnnouncement = (title: string) => { void publishAnnouncement({ title, automated: true, target: "calendar" }).catch((caught) => showError("Couldn’t share calendar update", caught)); };
   const refreshAll = async () => { await Promise.all([refreshRoom(), refresh()]); };
 
-  return <View style={styles.screen}>
+  return <TouchableWithoutFeedback accessible={false} onPress={Keyboard.dismiss}><View style={styles.screen}>
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl onRefresh={() => void refreshAll()} refreshing={loading} tintColor="#28634E" />}>
       <View style={styles.header}><View><Text style={styles.eyebrow}>YOUR NEST</Text><Text style={styles.title}>{room.room.name}</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Profile" onPress={() => router.push("/profile")} style={styles.profileButton}><Text style={styles.profileText}>Profile</Text></Pressable></View>
       <View style={styles.residentCard}><Text style={styles.residentLabel}>RESIDENTS</Text><View style={styles.residents}>{room.members.map((member) => <View key={member.userId} style={styles.resident}><View style={styles.avatar}><Text style={styles.avatarText}>{member.displayName.slice(0, 1).toUpperCase()}</Text></View><Text numberOfLines={1} style={styles.residentName}>{member.userId === userId ? "You" : member.displayName}</Text></View>)}</View></View>
@@ -75,7 +75,7 @@ function HomeContent({ refreshRoom, room, userId }: { refreshRoom: () => Promise
       <SharedCalendar currentUserName={currentUserName} onActivity={addCalendarAnnouncement} residents={residentNames} roomId={room.room.id} userId={userId} />
     </ScrollView>
     <AnnouncementForm canPin={isAdmin} visible={formVisible} onClose={() => setFormVisible(false)} onPublish={publish} />
-  </View>;
+  </View></TouchableWithoutFeedback>;
 }
 
 function AnnouncementCard({ canDelete, item, onRead, onDismiss, onDelete, onOpen }: { canDelete: boolean; item: Announcement; onRead: () => void; onDismiss: () => void; onDelete: () => void; onOpen: () => void }) { return <View style={[styles.card, !item.read && styles.unreadCard]}><View style={styles.cardTop}>{item.pinned ? <Text style={styles.pinned}>PINNED</Text> : <View />}{!item.read ? <View style={styles.unreadDot} /> : null}</View><Text style={styles.cardTitle}>{item.title}</Text><Text style={styles.meta}>By {item.author} · {item.date}</Text><View style={styles.actions}>{item.automated && item.target && item.target !== "calendar" ? <Pressable onPress={onOpen} style={styles.openButton}><Text style={styles.openButtonText}>Open related item</Text></Pressable> : null}{!item.read ? <Pressable onPress={onRead}><Text style={styles.actionText}>Mark read</Text></Pressable> : null}<Pressable onPress={onDismiss}><Text style={styles.actionText}>Dismiss</Text></Pressable>{canDelete ? <Pressable onPress={onDelete}><Text style={styles.deleteText}>Delete</Text></Pressable> : null}</View></View>; }
