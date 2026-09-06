@@ -142,12 +142,12 @@ export default function CreateJoinScreen() {
       </ScrollView>
 
       <Pressable
-        accessibilityLabel="Profile"
+        accessibilityLabel="Settings"
         accessibilityRole="button"
         onPress={() => router.push("/profile")}
         style={styles.profileButton}
       >
-        <Text style={styles.profileButtonText}>Profile</Text>
+        <Text style={styles.profileButtonText}>Settings</Text>
       </Pressable>
 
       <Modal animationType="fade" onRequestClose={() => setSwitchTarget(null)} transparent visible={switchTarget?.status === "switch_required"}>
