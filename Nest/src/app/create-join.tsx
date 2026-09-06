@@ -27,6 +27,7 @@ export default function CreateJoinScreen() {
     joinRoom,
     loading,
     pendingInvite,
+    refresh,
     room,
     user,
   } = useRoom();
@@ -97,6 +98,10 @@ export default function CreateJoinScreen() {
 
   if (!user) {
     return <View style={styles.center}><Text style={styles.title}>Sign in first</Text><Text style={styles.body}>You need an authenticated account and display name before creating or joining a Nest.</Text><Pressable onPress={() => router.replace("/(auth)/sign-in")} style={styles.primaryButton}><Text style={styles.primaryButtonText}>Go to login</Text></Pressable></View>;
+  }
+
+  if (roomError) {
+    return <View style={styles.center}><Text style={styles.title}>Couldn’t open your Nest</Text><Text style={styles.body}>{roomError}</Text><Pressable onPress={() => void refresh()} style={styles.primaryButton}><Text style={styles.primaryButtonText}>Try again</Text></Pressable></View>;
   }
 
   return (

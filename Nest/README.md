@@ -37,13 +37,39 @@ Apply the migrations in `supabase/migrations` to the same Supabase project used
 by authentication. They create profiles, rooms, memberships, 10-minute
 invitations, transactional RPCs, and Row Level Security policies.
 
+`20260905020000_create_shared_nest_data.sql` adds persistent chores and
+announcements. Run it after the room migrations. It also enables Supabase
+Realtime for those tables, keeps announcement read/dismiss state per user, and
+limits every query and write to authenticated members of the matching Nest.
+
+`20260905030000_create_shared_groceries.sql` adds the shared grocery list. Run
+it after `20260905020000_create_shared_nest_data.sql`. Grocery additions,
+edits, purchase status, restores, and deletions then update every signed-in
+member of the same Nest through Supabase Realtime.
+
+`20260905040000_fix_legacy_rooms_join_code.sql` repairs projects whose existing
+`rooms` table still requires the old `join_code` column. The current invite
+system uses `room_invites`, so this compatibility migration keeps the legacy
+column but makes it optional. Run it if creating a Nest reports a null
+`join_code` constraint error.
+
+`20260905050000_add_leave_nest.sql` adds the transactional leave flow. It
+automatically promotes the earliest-joined remaining member when an admin
+leaves, revokes that admin's active invitations, and deletes the Nest and all
+of its shared data when its final member leaves. It also applies those same
+rules when a user confirms that they want to switch to a different Nest.
+
+`20260905060000_allow_member_invites.sql` allows every current Nest member to
+view, share, and regenerate the room's shared 10-minute invitation. It keeps
+invite access isolated to the matching Nest and broadcasts regenerated invites
+to the other members through Supabase Realtime.
+
 The authentication flow stores the display name in `profiles.full_name`, with
-the authenticated user ID as `profiles.id`. Email sign-in links return through
-`auth/callback`; first-time users are then routed to Profile Setup. In Supabase
-Authentication > URL Configuration, allow `nest://**` for development/standalone
-builds and temporarily allow `exp://**` when testing callbacks in Expo Go. A
-pending `nest://join/<token>` invitation is kept through sign-in and profile
-setup.
+the authenticated user ID as `profiles.id`. Email sign-in uses a six-digit OTP;
+first-time users are then routed to Profile Setup. In Supabase Authentication >
+Email Templates > Magic Link, include `{{ .Token }}` in the message instead of
+`{{ .ConfirmationURL }}` so Supabase sends a code instead of a link. A pending
+Nest invitation is kept through sign-in and profile setup.
 
 All future shared-data tables must have a non-null `room_id`. Their Row Level
 Security policies should authorize access with

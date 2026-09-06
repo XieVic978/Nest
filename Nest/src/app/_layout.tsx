@@ -3,7 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 import { SessionProvider, useSession } from "@/auth/ctx";
-import { RoomProvider } from "@/features/rooms/RoomProvider";
+import { RoomProvider, useRoom } from "@/features/rooms/RoomProvider";
 
 export default function RootLayout() {
   return (
@@ -18,20 +18,27 @@ export default function RootLayout() {
 
 function RootNavigator() {
   const { user, hasCompletedProfile, isLoading } = useSession();
+  const { loading: roomLoading, room } = useRoom();
   const isSignedIn = Boolean(user);
   const onboarded = isSignedIn && hasCompletedProfile;
 
-  if (isLoading) {
+  if (isLoading || (onboarded && roomLoading)) {
     return <View style={styles.loading}><ActivityIndicator color="#28634E" size="large" /></View>;
   }
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={onboarded}>
+      <Stack.Protected guard={onboarded && !room}>
         <Stack.Screen name="create-join" />
+      </Stack.Protected>
+
+      <Stack.Protected guard={onboarded && Boolean(room)}>
         <Stack.Screen name="(room)" />
-        <Stack.Screen name="profile" />
         <Stack.Screen name="room-settings" />
+      </Stack.Protected>
+
+      <Stack.Protected guard={onboarded}>
+        <Stack.Screen name="profile" />
       </Stack.Protected>
 
       <Stack.Protected guard={isSignedIn && !hasCompletedProfile}>

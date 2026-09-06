@@ -182,7 +182,7 @@ begin
       'joinedAt', v_membership.joined_at
     ),
     'members', (
-      select pg_catalog.coalesce(
+      select coalesce(
         pg_catalog.jsonb_agg(
           pg_catalog.jsonb_build_object(
             'userId', member.user_id,

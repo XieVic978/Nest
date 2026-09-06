@@ -35,3 +35,10 @@ export type JoinResult =
   | { status: "joined" | "already_member"; roomId: string; roomName: string }
   | { status: "switch_required"; roomId: string; roomName: string }
   | { status: "admin_transfer_required"; roomId: string; roomName: string };
+
+export type LeaveNestResult = {
+  status: "left";
+  roomId: string;
+  roomDeleted: boolean;
+  newAdminUserId: string | null;
+};

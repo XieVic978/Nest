@@ -2,6 +2,11 @@
 -- for history; it does not grant extra in-app access.
 alter table public.rooms add column if not exists join_code text;
 
+-- Earlier migrations may create a Nest before this permanent-code layer is
+-- applied. A default keeps future create_nest calls compatible either way.
+alter table public.rooms alter column join_code set default
+  upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 10));
+
 update public.rooms
 set join_code = upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 10))
 where join_code is null;
@@ -19,7 +24,12 @@ as $$
   where members.user_id = auth.uid()
 $$;
 
-create or replace function public.leave_nest()
+-- An earlier migration can provide a JSON-returning leave_nest RPC. PostgreSQL
+-- cannot replace a function with a different return type, so remove that
+-- signature before restoring the equal-member, membership-only behavior.
+drop function if exists public.leave_nest();
+
+create function public.leave_nest()
 returns void
 language plpgsql security definer set search_path = ''
 as $$
