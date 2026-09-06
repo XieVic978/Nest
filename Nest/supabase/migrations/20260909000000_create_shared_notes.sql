@@ -9,8 +9,8 @@ create table if not exists public.shared_notes (
   updated_at timestamptz not null default now()
 );
 
-create index if not exists shared_notes_room_updated_idx
-  on public.shared_notes(room_id, updated_at desc);
+create unique index if not exists shared_notes_one_per_room
+  on public.shared_notes(room_id);
 
 alter table public.shared_notes enable row level security;
 alter table public.shared_notes replica identity full;
