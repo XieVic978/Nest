@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useSession } from "@/auth/ctx";
 import { validateFullName, validatePhone } from "@/auth/validation";
@@ -21,6 +21,17 @@ export default function ProfileSetup() {
   const [errors, setErrors] = useState<{ fullName?: string; phone?: string }>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  function confirmSignOut() {
+    Alert.alert(
+      "Sign out of Nest?",
+      "Your incomplete profile setup will stay unfinished until you log back in.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Sign out", style: "destructive", onPress: () => void signOut() },
+      ],
+    );
+  }
 
   async function handleSubmit() {
     // Name is required; phone (and Venmo/Zelle) are optional. Phone is only
@@ -117,7 +128,7 @@ export default function ProfileSetup() {
       <PrimaryButton title="Continue" onPress={handleSubmit} loading={submitting} />
 
       <View style={styles.footer}>
-        <Pressable accessibilityRole="button" onPress={signOut}>
+        <Pressable accessibilityRole="button" onPress={confirmSignOut}>
           <Text style={styles.link}>Sign out</Text>
         </Pressable>
       </View>
