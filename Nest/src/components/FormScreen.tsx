@@ -31,6 +31,7 @@ export function FormScreen({
       >
         <ScrollView
           contentContainerStyle={styles.content}
+          keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.header} {...rest}>

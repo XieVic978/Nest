@@ -19,6 +19,8 @@ export function FormField({ label, error, style, ...inputProps }: FormFieldProps
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
+        blurOnSubmit
+        returnKeyType="done"
         style={[styles.input, error ? styles.inputError : null, style]}
         placeholderTextColor="#9aa0a6"
         {...inputProps}
