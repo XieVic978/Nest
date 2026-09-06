@@ -55,6 +55,7 @@ export type ExpensePaymentStatus = "open" | "pending" | "confirmed";
 export type NestExpenseParticipant = {
   userId: string;
   paymentStatus: ExpensePaymentStatus;
+  shareAmount: number;
 };
 
 export type NestExpense = {

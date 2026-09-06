@@ -15,9 +15,20 @@ export type ExpenseInput = {
   participantUserIds: string[];
 };
 
+export type ReceiptExpenseInput = {
+  title: string;
+  amount: number;
+  date: string;
+  description: string;
+  participantUserIds: string[];
+  items: { name: string; amount: number; assignedUserId: string | null }[];
+  imagePath?: string | null;
+};
+
 type ParticipantRow = {
   user_id: string;
   payment_status: ExpensePaymentStatus;
+  share_amount: number | string | null;
 };
 
 type SettlementRow = {
@@ -37,6 +48,7 @@ function normalizeExpense(row: Record<string, unknown>): NestExpense {
   const participants: NestExpenseParticipant[] = participantRows.map((participant) => ({
     userId: String(participant.user_id),
     paymentStatus: participant.payment_status,
+    shareAmount: Number(participant.share_amount ?? 0),
   }));
 
   return {
@@ -65,7 +77,7 @@ export function useExpenses(roomId: string) {
     const client = getSupabaseClient();
     const { data, error: loadError } = await client
       .from("nest_expenses")
-      .select("*, nest_expense_participants(user_id, payment_status)")
+      .select("*, nest_expense_participants(user_id, payment_status, share_amount)")
       .eq("room_id", roomId)
       .order("expense_date", { ascending: false })
       .order("created_at", { ascending: false });
@@ -150,6 +162,22 @@ export function useExpenses(roomId: string) {
     await refresh();
   }, [refresh]);
 
+  const createReceiptExpense = useCallback(async (input: ReceiptExpenseInput) => {
+    const client = getSupabaseClient();
+    const { error: receiptError } = await client.rpc("create_nest_receipt_expense", {
+      p_room_id: roomId,
+      p_title: input.title.trim(),
+      p_amount: input.amount,
+      p_expense_date: input.date,
+      p_description: input.description.trim(),
+      p_participant_user_ids: input.participantUserIds,
+      p_items: input.items.map((item) => ({ name: item.name.trim(), amount: item.amount, assignedUserId: item.assignedUserId })),
+      p_image_path: input.imagePath ?? null,
+    });
+    if (receiptError) throw receiptError;
+    await refresh();
+  }, [refresh, roomId]);
+
   const recordSettlement = useCallback(async (
     recipientUserId: string,
     amount: number,
@@ -168,5 +196,5 @@ export function useExpenses(roomId: string) {
     await refresh();
   }, [refresh, roomId]);
 
-  return { contacts, createExpense, error, expenses, loading, recordSettlement, refresh, settlements, setPaymentStatus };
+  return { contacts, createExpense, createReceiptExpense, error, expenses, loading, recordSettlement, refresh, settlements, setPaymentStatus };
 }
