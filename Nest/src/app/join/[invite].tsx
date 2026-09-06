@@ -59,7 +59,7 @@ export default function JoinInviteScreen() {
     void accept(false);
   }, [hasCompletedProfile, loading, user]);
 
-  if (loading) return <View style={styles.center}><ActivityIndicator color="#28634E" size="large" /><Text style={styles.body}>Checking your invitation…</Text></View>;
+  if (loading) return <View style={styles.center}><ActivityIndicator color="#4975A8" size="large" /><Text style={styles.body}>Checking your invitation…</Text></View>;
 
   if (!configurationReady) return <View style={styles.center}><Text style={styles.title}>Nest isn’t connected yet</Text><Text style={styles.body}>Supabase environment values are required before this invitation can be opened.</Text></View>;
 
@@ -73,7 +73,7 @@ export default function JoinInviteScreen() {
 
   return (
     <View style={styles.center}>
-      {joining ? <ActivityIndicator color="#28634E" size="large" /> : null}
+      {joining ? <ActivityIndicator color="#4975A8" size="large" /> : null}
       <Text style={styles.title}>{error ? "Couldn’t join this Nest" : "Joining your Nest…"}</Text>
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : <Text style={styles.body}>We’re validating the invitation and your membership.</Text>}
       {error ? <Pressable onPress={() => { clearPendingInvite(); router.replace("/create-join"); }} style={styles.secondary}><Text style={styles.secondaryText}>Enter a different code</Text></Pressable> : null}
@@ -86,19 +86,19 @@ export default function JoinInviteScreen() {
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 28, backgroundColor: "#F7F5EF" },
-  title: { color: "#18251F", fontSize: 28, fontWeight: "900", textAlign: "center" },
-  modalTitle: { color: "#18251F", fontSize: 22, fontWeight: "900" },
-  body: { maxWidth: 430, color: "#5E6B65", fontSize: 16, lineHeight: 23, marginTop: 12, textAlign: "center" },
-  error: { maxWidth: 430, color: "#A13D32", fontSize: 15, lineHeight: 22, marginTop: 12, textAlign: "center" },
-  primary: { marginTop: 22, borderRadius: 13, paddingHorizontal: 20, paddingVertical: 14, backgroundColor: "#28634E" },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 28, backgroundColor: "#FFFCF5" },
+  title: { color: "#24374B", fontFamily: "Georgia", fontSize: 31, fontWeight: "700", textAlign: "center" },
+  modalTitle: { color: "#24374B", fontFamily: "Georgia", fontSize: 24, fontWeight: "700" },
+  body: { maxWidth: 430, color: "#6B7785", fontSize: 16, lineHeight: 23, marginTop: 12, textAlign: "center" },
+  error: { maxWidth: 430, color: "#B95048", fontSize: 15, lineHeight: 22, marginTop: 12, textAlign: "center" },
+  primary: { marginTop: 22, borderRadius: 14, paddingHorizontal: 20, paddingVertical: 14, backgroundColor: "#4975A8" },
   primaryText: { color: "#FFFFFF", fontWeight: "900" },
-  secondary: { marginTop: 18, borderRadius: 13, paddingHorizontal: 18, paddingVertical: 13, borderColor: "#28634E", borderWidth: 1 },
-  secondaryText: { color: "#28634E", fontWeight: "900" },
-  backdrop: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: "rgba(12, 25, 18, 0.48)" },
+  secondary: { marginTop: 18, borderRadius: 14, paddingHorizontal: 18, paddingVertical: 13, borderColor: "#4975A8", borderWidth: 1 },
+  secondaryText: { color: "#4975A8", fontWeight: "900" },
+  backdrop: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: "rgba(36,55,75,.46)" },
   modal: { width: "100%", maxWidth: 440, borderRadius: 20, padding: 22, backgroundColor: "#FFFFFF" },
   actions: { flexDirection: "row", gap: 10, marginTop: 24 },
-  cancel: { flex: 1, alignItems: "center", borderRadius: 12, padding: 14, backgroundColor: "#EEF0EC" },
-  cancelText: { color: "#33443C", fontWeight: "900" },
-  danger: { flex: 1.4, alignItems: "center", borderRadius: 12, padding: 14, backgroundColor: "#A13D32" },
+  cancel: { flex: 1, alignItems: "center", borderRadius: 12, padding: 14, backgroundColor: "#F0F3F3" },
+  cancelText: { color: "#4D6072", fontWeight: "900" },
+  danger: { flex: 1.4, alignItems: "center", borderRadius: 12, padding: 14, backgroundColor: "#EE8069" },
 });

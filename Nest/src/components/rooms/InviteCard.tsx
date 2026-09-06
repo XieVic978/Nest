@@ -71,29 +71,29 @@ export function InviteCard({ code, onRegenerate }: InviteCardProps) {
 
       <View style={styles.actions}>
         <Pressable disabled={!code || busy} onPress={() => void shareInvite()} style={[styles.primary, (!code || busy) && styles.disabled]}><Text style={styles.primaryText}>Share invite</Text></Pressable>
-        <Pressable disabled={busy} onPress={() => void regenerate()} style={styles.secondary}>{busy ? <ActivityIndicator color="#28634E" /> : <Text style={styles.secondaryText}>Regenerate code</Text>}</Pressable>
+        <Pressable disabled={busy} onPress={() => void regenerate()} style={styles.secondary}>{busy ? <ActivityIndicator color="#4975A8" /> : <Text style={styles.secondaryText}>Regenerate code</Text>}</Pressable>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 20, padding: 20, backgroundColor: "#E8F1EC", borderWidth: 1, borderColor: "#D4E3DA" },
+  card: { borderRadius: 20, padding: 20, backgroundColor: "#FFF3D8", borderWidth: 1, borderColor: "#F5D59C" },
   headingRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
   headingCopy: { flex: 1 },
-  eyebrow: { color: "#47745F", fontSize: 11, fontWeight: "900", letterSpacing: 1.4 },
-  title: { color: "#18251F", fontSize: 20, fontWeight: "900", marginTop: 5 },
-  body: { color: "#5E6B65", fontSize: 14, lineHeight: 20, marginTop: 12 },
-  label: { color: "#5E6B65", fontSize: 11, fontWeight: "800", marginTop: 16, marginBottom: 6, textTransform: "uppercase" },
+  eyebrow: { color: "#4975A8", fontSize: 11, fontWeight: "900", letterSpacing: 1.4 },
+  title: { color: "#24374B", fontFamily: "Georgia", fontSize: 23, fontWeight: "700", marginTop: 5 },
+  body: { color: "#4D6072", fontSize: 14, lineHeight: 20, marginTop: 12 },
+  label: { color: "#4D6072", fontSize: 11, fontWeight: "800", marginTop: 16, marginBottom: 6, textTransform: "uppercase" },
   valueRow: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 12, paddingHorizontal: 13, backgroundColor: "#FFFFFF" },
-  code: { flex: 1, color: "#18251F", fontSize: 19, fontWeight: "900", letterSpacing: 1.8 },
-  link: { flex: 1, color: "#33443C", fontSize: 13, fontWeight: "600" },
-  copy: { color: "#28634E", fontSize: 11, fontWeight: "900" },
-  notice: { color: "#47745F", fontSize: 12, lineHeight: 17, marginTop: 10 },
+  code: { flex: 1, color: "#24374B", fontSize: 19, fontWeight: "900", letterSpacing: 1.8 },
+  link: { flex: 1, color: "#4D6072", fontSize: 13, fontWeight: "600" },
+  copy: { color: "#4975A8", fontSize: 11, fontWeight: "900" },
+  notice: { color: "#2D6C6A", fontSize: 12, lineHeight: 17, marginTop: 10 },
   actions: { flexDirection: "row", gap: 10, marginTop: 16 },
-  primary: { flex: 1.4, alignItems: "center", borderRadius: 12, padding: 13, backgroundColor: "#28634E" },
+  primary: { flex: 1.4, alignItems: "center", borderRadius: 14, padding: 13, backgroundColor: "#4975A8" },
   primaryText: { color: "#FFFFFF", fontWeight: "900" },
-  secondary: { flex: 1, alignItems: "center", borderRadius: 12, padding: 13, borderWidth: 1, borderColor: "#B6C9BE", backgroundColor: "#FFFFFF" },
+  secondary: { flex: 1, alignItems: "center", borderRadius: 14, padding: 13, borderWidth: 1, borderColor: "#E4E8E8", backgroundColor: "#FFFFFF" },
   disabled: { opacity: 0.55 },
-  secondaryText: { color: "#28634E", fontWeight: "900" },
+  secondaryText: { color: "#4975A8", fontWeight: "900" },
 });

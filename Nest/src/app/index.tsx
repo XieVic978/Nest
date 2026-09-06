@@ -11,7 +11,7 @@ export default function AppIndex() {
   const { loading: roomLoading, room } = useRoom();
 
   if (isLoading || (user && hasCompletedProfile && roomLoading)) {
-    return <View style={styles.loading}><ActivityIndicator color="#28634E" size="large" /></View>;
+    return <View style={styles.loading}><ActivityIndicator color="#4975A8" size="large" /></View>;
   }
   if (!user) return <Redirect href="/(auth)/sign-in" />;
   if (!hasCompletedProfile) return <Redirect href="/profile-setup" />;
@@ -20,4 +20,4 @@ export default function AppIndex() {
   return <Redirect href={room ? ROOM_HOME : "/create-join"} />;
 }
 
-const styles = StyleSheet.create({ loading: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#F7F5EF" } });
+const styles = StyleSheet.create({ loading: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFCF5" } });

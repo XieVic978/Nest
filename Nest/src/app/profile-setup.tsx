@@ -137,7 +137,7 @@ export default function ProfileSetup() {
 }
 
 const styles = StyleSheet.create({
-  formError: { color: "#d64545", fontSize: 14, marginBottom: 14 },
+  formError: { color: "#B95048", fontSize: 14, marginBottom: 14 },
   footer: { alignItems: "center", marginTop: 24 },
-  link: { color: "#6b7280", fontSize: 14, fontWeight: "600" },
+  link: { color: "#6B7785", fontSize: 14, fontWeight: "700" },
 });

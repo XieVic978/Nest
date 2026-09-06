@@ -3,6 +3,7 @@
 
 import {
   KeyboardAvoidingView,
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -12,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { KeyboardDismissView } from "@/components/KeyboardDismissView";
+import { nestTheme } from "@/theme/nest";
 
 interface FormScreenProps extends ViewProps {
   title: string;
@@ -36,7 +38,10 @@ export function FormScreen({
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.header} {...rest}>
-            <Text style={styles.title}>{title}</Text>
+            <View style={styles.titleRow}>
+              <View style={styles.titleCopy}><Text style={styles.eyebrow}>NEST</Text><Text style={styles.title}>{title}</Text></View>
+              <Image accessibilityIgnoresInvertColors source={require("../../assets/images/nest/bird-hero.png")} style={styles.bird} />
+            </View>
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           </View>
           {children}
@@ -49,7 +54,7 @@ export function FormScreen({
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: "#f5f7fa",
+    backgroundColor: nestTheme.colors.canvas,
   },
   flex: {
     flex: 1,
@@ -60,16 +65,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   header: {
-    marginBottom: 28,
+    marginBottom: 30,
   },
+  titleRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
+  titleCopy: { flex: 1, paddingRight: 8 },
+  eyebrow: { color: nestTheme.colors.blue, fontSize: 10, fontWeight: "800", letterSpacing: 1.5, marginBottom: 7 },
+  bird: { width: 66, height: 66, resizeMode: "contain", marginTop: -9 },
   title: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#111827",
+    fontFamily: "Georgia",
+    fontSize: 34,
+    fontWeight: "700",
+    color: nestTheme.colors.ink,
+    letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 15,
-    color: "#6b7280",
+    color: nestTheme.colors.muted,
     marginTop: 8,
     lineHeight: 21,
   },
