@@ -78,7 +78,7 @@ export default function SignIn() {
       subtitle={
         step === "email"
           ? "Enter your email and we'll send you a one-time code."
-          : `Enter the 6-digit code we sent to ${email}.`
+          : `Enter the code we sent to ${email}.`
       }
     >
       {step === "email" ? (
@@ -128,8 +128,8 @@ export default function SignIn() {
             keyboardType="number-pad"
             autoComplete="one-time-code"
             textContentType="oneTimeCode"
-            maxLength={6}
-            placeholder="123456"
+            maxLength={8}
+            placeholder="12345678"
           />
 
           {formError ? <Text style={styles.formError}>{formError}</Text> : null}

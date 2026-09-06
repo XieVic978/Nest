@@ -10,11 +10,12 @@ export function validateEmail(email: string): string | null {
   return null;
 }
 
-// One-time login code: exactly 6 digits.
+// One-time login code. Supabase's email OTP is 6–8 digits depending on the
+// project's configured token length, so accept any code in that range.
 export function validateOtpCode(code: string): string | null {
   const trimmed = code.trim();
   if (!trimmed) return "Enter the code we sent you.";
-  if (!/^\d{6}$/.test(trimmed)) return "Enter the 6-digit code.";
+  if (!/^\d{6,8}$/.test(trimmed)) return "Enter the code from your email.";
   return null;
 }
 

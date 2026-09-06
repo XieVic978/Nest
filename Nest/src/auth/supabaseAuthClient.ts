@@ -45,6 +45,9 @@ function toUser(id: string, email: string, row: ProfileRow | null): User {
 }
 
 // Fetch the profile row for a user id, or null if none exists yet.
+// If the query fails (e.g. the `profiles` table isn't set up), log the real
+// error and treat it as "no profile" rather than throwing, so a missing table
+// doesn't crash the whole sign-in flow with an opaque promise rejection.
 async function fetchProfile(userId: string): Promise<ProfileRow | null> {
   const client = requireClient();
   const { data, error } = await client
@@ -52,7 +55,10 @@ async function fetchProfile(userId: string): Promise<ProfileRow | null> {
     .select("id, full_name, phone, venmo, zelle")
     .eq("id", userId)
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    console.warn("[Nest] Could not read profiles table:", error.message);
+    return null;
+  }
   return (data as ProfileRow) ?? null;
 }
 
@@ -117,7 +123,10 @@ export const supabaseAuthClient: AuthClient = {
       venmo: clean(profile.venmo),
       zelle: clean(profile.zelle),
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) {
+      console.warn("[Nest] Could not save profile:", error.message);
+      return { ok: false, error: error.message };
+    }
 
     const { data: userData } = await client.auth.getUser();
     const row = await fetchProfile(userId);
