@@ -178,6 +178,12 @@ export function useExpenses(roomId: string) {
     await refresh();
   }, [refresh, roomId]);
 
+  const removeExpense = useCallback(async (expenseId: string) => {
+    const { error: deleteError } = await getSupabaseClient().rpc("delete_nest_expense", { p_expense_id: expenseId });
+    if (deleteError) throw deleteError;
+    await refresh();
+  }, [refresh]);
+
   const recordSettlement = useCallback(async (
     recipientUserId: string,
     amount: number,
@@ -196,5 +202,5 @@ export function useExpenses(roomId: string) {
     await refresh();
   }, [refresh, roomId]);
 
-  return { contacts, createExpense, createReceiptExpense, error, expenses, loading, recordSettlement, refresh, settlements, setPaymentStatus };
+  return { contacts, createExpense, createReceiptExpense, error, expenses, loading, recordSettlement, refresh, removeExpense, settlements, setPaymentStatus };
 }

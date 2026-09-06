@@ -59,10 +59,10 @@ export default function VerifyEmail() {
 }
 
 const styles = StyleSheet.create({
-  error: { color: "#d64545", fontSize: 14, marginBottom: 14 },
-  notice: { color: "#28634E", fontSize: 14, marginBottom: 14 },
+  error: { color: "#B95048", fontSize: 14, marginBottom: 14 },
+  notice: { color: "#2D6C6A", fontSize: 14, marginBottom: 14 },
   resend: { alignItems: "center", marginTop: 20 },
   back: { alignItems: "center", marginTop: 16 },
-  link: { color: "#2f6fed", fontSize: 14, fontWeight: "600" },
-  backText: { color: "#59636f", fontSize: 14, fontWeight: "600" },
+  link: { color: "#4975A8", fontSize: 14, fontWeight: "800" },
+  backText: { color: "#6B7785", fontSize: 14, fontWeight: "700" },
 });

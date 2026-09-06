@@ -18,6 +18,7 @@
     "expo-env.d.ts"
   ],
   "exclude": [
-    "codebox-hackathon"
+    "codebox-hackathon",
+    "supabase/functions"
   ]
 }

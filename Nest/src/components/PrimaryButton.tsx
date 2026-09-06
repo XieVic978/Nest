@@ -8,6 +8,7 @@ import {
   Text,
   type PressableProps,
 } from "react-native";
+import { nestTheme } from "@/theme/nest";
 
 interface PrimaryButtonProps extends Omit<PressableProps, "children"> {
   title: string;
@@ -46,18 +47,18 @@ export function PrimaryButton({
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: "#2f6fed",
-    borderRadius: 10,
-    paddingVertical: 14,
+    backgroundColor: nestTheme.colors.blue,
+    borderRadius: nestTheme.radius.control,
+    paddingVertical: 15,
     alignItems: "center",
     justifyContent: "center",
     minHeight: 50,
   },
   pressed: {
-    backgroundColor: "#255fd1",
+    backgroundColor: nestTheme.colors.blueDark,
   },
   disabled: {
-    backgroundColor: "#9db8f5",
+    backgroundColor: "#AFC5DB",
   },
   label: {
     color: "#fff",

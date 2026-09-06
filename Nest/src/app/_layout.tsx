@@ -23,7 +23,7 @@ function RootNavigator() {
   const onboarded = isSignedIn && hasCompletedProfile;
 
   if (isLoading || (onboarded && roomLoading)) {
-    return <View style={styles.loading}><ActivityIndicator color="#28634E" size="large" /></View>;
+    return <View style={styles.loading}><ActivityIndicator color="#4975A8" size="large" /></View>;
   }
 
   return (
@@ -56,5 +56,5 @@ function RootNavigator() {
 }
 
 const styles = StyleSheet.create({
-  loading: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#F7F5EF" },
+  loading: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFCF5" },
 });
