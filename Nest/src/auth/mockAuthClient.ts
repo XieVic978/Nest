@@ -73,8 +73,8 @@ export const mockAuthClient: AuthClient = {
   async signUp(email, _password): Promise<VoidResult> {
     const key = normalizeEmail(email);
     if (users.has(key)) return { ok: false, error: "An account already exists for this email." };
-    pendingCodes.set(key, { code: "123456", purpose: "signup" });
-    console.log(`[Nest verification code for ${key}] 123456`);
+    pendingCodes.set(key, { code: "12345678", purpose: "signup" });
+    console.log(`[Nest verification code for ${key}] 12345678`);
     return { ok: true };
   },
 
@@ -97,14 +97,14 @@ export const mockAuthClient: AuthClient = {
   },
 
   async resendVerificationCode(email): Promise<VoidResult> {
-    pendingCodes.set(normalizeEmail(email), { code: "123456", purpose: "signup" });
+    pendingCodes.set(normalizeEmail(email), { code: "12345678", purpose: "signup" });
     return { ok: true };
   },
 
   async sendPasswordResetCode(email): Promise<VoidResult> {
     const key = normalizeEmail(email);
     if (!users.has(key)) return { ok: true };
-    pendingCodes.set(key, { code: "123456", purpose: "recovery" });
+    pendingCodes.set(key, { code: "12345678", purpose: "recovery" });
     return { ok: true };
   },
 
