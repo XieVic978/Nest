@@ -99,8 +99,14 @@ export function RoomProvider({ children }: PropsWithChildren) {
           "get_active_nest_invite",
           { p_room_id: snapshot.room.id },
         );
-        if (inviteError) throw inviteError;
-        setActiveInvite(normalizeInvite(inviteData));
+        if (inviteError) {
+          // A missing/expired invite must not hide a valid room membership.
+          // Admins can regenerate the invite from the Nest home screen.
+          console.warn("[Nest] Could not load the active invite:", inviteError.message);
+          setActiveInvite(null);
+        } else {
+          setActiveInvite(normalizeInvite(inviteData));
+        }
       } else {
         setActiveInvite(null);
       }
@@ -159,7 +165,16 @@ export function RoomProvider({ children }: PropsWithChildren) {
         p_display_name: getDisplayName(currentUser),
         p_name: name.trim(),
       });
-      if (createError) throw toRoomError(createError);
+      if (createError) {
+        const normalizedError = toRoomError(createError);
+        if (normalizedError.code === "already_in_nest") {
+          // The database is the source of truth. Recover stale client state by
+          // loading the existing membership instead of showing a create error.
+          await refresh();
+          return;
+        }
+        throw normalizedError;
+      }
 
       const result = data as { invite?: RoomInvite } | null;
       setActiveInvite(result?.invite ?? null);
