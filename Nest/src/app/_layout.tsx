@@ -4,7 +4,6 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 import { SessionProvider, useSession } from "@/auth/ctx";
 import { RoomProvider, useRoom } from "@/features/rooms/RoomProvider";
-import { KeyboardDismissView } from "@/components/KeyboardDismissView";
 
 export default function RootLayout() {
   return (
@@ -28,7 +27,7 @@ function RootNavigator() {
   }
 
   return (
-    <KeyboardDismissView><Stack screenOptions={{ headerShown: false }}>
+    <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={onboarded && !room}>
         <Stack.Screen name="create-join" />
       </Stack.Protected>
@@ -52,7 +51,7 @@ function RootNavigator() {
 
       <Stack.Screen name="auth/callback" />
       <Stack.Screen name="join/[invite]" />
-    </Stack></KeyboardDismissView>
+    </Stack>
   );
 }
 
