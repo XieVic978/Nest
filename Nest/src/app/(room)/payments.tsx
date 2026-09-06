@@ -1,4 +1,8 @@
-import { StyleSheet, Text, View } from "react-native";
+// Payments is the in-room entry point for the shared-expenses experience.
+// Keeping the screen implementation in ../expenses also preserves its direct
+// /expenses route for development and review.
+import Expenses from "../expenses";
 
-export default function PaymentsScreen() { return <View style={styles.screen}><Text style={styles.title}>Payments</Text></View>; }
-const styles = StyleSheet.create({ screen: { flex: 1, backgroundColor: "#F7F5EF", padding: 24, paddingTop: 72 }, title: { fontSize: 30, fontWeight: "800", color: "#18251F" } });
+export default function PaymentsScreen() {
+  return <Expenses />;
+}
