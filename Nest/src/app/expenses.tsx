@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -15,6 +17,7 @@ import {
 } from "react-native";
 
 import { useRoom } from "@/features/rooms/RoomProvider";
+import { KeyboardDismissView } from "@/components/KeyboardDismissView";
 import type { RoomMember } from "@/features/rooms/types";
 import type { ExpenseInput } from "@/features/shared-data/useExpenses";
 import { useExpenses } from "@/features/shared-data/useExpenses";
@@ -318,6 +321,11 @@ function ExpenseForm({
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
 
+  const close = () => {
+    Keyboard.dismiss();
+    onClose();
+  };
+
   useEffect(() => {
     if (visible) {
       setPayerUserId(currentUserId);
@@ -366,20 +374,24 @@ function ExpenseForm({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={close}>
+      <KeyboardDismissView>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.backdrop}
+      >
         <View style={styles.sheet}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Add expense</Text>
-            <Pressable onPress={onClose}><Text style={styles.close}>Close</Text></Pressable>
+            <Pressable onPress={close}><Text style={styles.close}>Close</Text></Pressable>
           </View>
-          <ScrollView>
+          <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
             <Text style={styles.label}>TITLE</Text>
-            <TextInput value={title} onChangeText={setTitle} placeholder="e.g. Internet bill" style={styles.input} />
+            <TextInput enterKeyHint="done" onSubmitEditing={Keyboard.dismiss} value={title} onChangeText={setTitle} placeholder="e.g. Internet bill" style={styles.input} />
             <Text style={styles.label}>AMOUNT</Text>
-            <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" style={styles.input} />
+            <TextInput enterKeyHint="done" onSubmitEditing={Keyboard.dismiss} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" style={styles.input} />
             <Text style={styles.label}>DATE</Text>
-            <TextInput value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" style={styles.input} />
+            <TextInput enterKeyHint="done" onSubmitEditing={Keyboard.dismiss} value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" style={styles.input} />
             <Text style={styles.label}>CATEGORY</Text>
             <ScrollView horizontal contentContainerStyle={styles.filters}>
               {CATEGORIES.map((option) => (
@@ -413,7 +425,8 @@ function ExpenseForm({
             </Pressable>
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
+      </KeyboardDismissView>
     </Modal>
   );
 }

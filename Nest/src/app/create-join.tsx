@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -13,6 +14,7 @@ import {
   View,
 } from "react-native";
 
+import { KeyboardDismissView } from "@/components/KeyboardDismissView";
 import { toRoomError } from "@/features/rooms/errors";
 import { useRoom } from "@/features/rooms/RoomProvider";
 import type { JoinResult } from "@/features/rooms/types";
@@ -105,7 +107,8 @@ export default function CreateJoinScreen() {
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.screen}>
+    <KeyboardDismissView>
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
         <Text style={styles.eyebrow}>WELCOME HOME</Text>
         <Text style={styles.title}>Create a new Nest or join a Nest</Text>
@@ -121,7 +124,7 @@ export default function CreateJoinScreen() {
             <>
               <Text style={styles.cardTitle}>Name your Nest</Text>
               <Text style={styles.label}>Nest name</Text>
-              <TextInput accessibilityLabel="Nest name" autoCapitalize="words" maxLength={60} onChangeText={setRoomName} placeholder="Maple Street House" placeholderTextColor="#89938E" returnKeyType="done" style={styles.input} value={roomName} />
+              <TextInput accessibilityLabel="Nest name" autoCapitalize="words" enterKeyHint="done" maxLength={60} onChangeText={setRoomName} onSubmitEditing={Keyboard.dismiss} placeholder="Maple Street House" placeholderTextColor="#89938E" style={styles.input} value={roomName} />
               <Text style={styles.helper}>Every roommate has equal access. A permanent code will be available in Documents.</Text>
               <Pressable accessibilityRole="button" disabled={submitting} onPress={() => void handleCreate()} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, submitting && styles.disabled]}>{submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Create a new Nest</Text>}</Pressable>
             </>
@@ -129,7 +132,7 @@ export default function CreateJoinScreen() {
             <>
               <Text style={styles.cardTitle}>Join your roommates</Text>
               <Text style={styles.label}>Permanent Nest code</Text>
-              <TextInput accessibilityLabel="Permanent Nest code" autoCapitalize="characters" autoCorrect={false} onChangeText={setInvite} placeholder="ABCDE-FGHIJ" placeholderTextColor="#89938E" returnKeyType="go" style={styles.input} value={invite} />
+              <TextInput accessibilityLabel="Permanent Nest code" autoCapitalize="characters" autoCorrect={false} enterKeyHint="done" onChangeText={setInvite} onSubmitEditing={Keyboard.dismiss} placeholder="ABCDE-FGHIJ" placeholderTextColor="#89938E" style={styles.input} value={invite} />
               <Text style={styles.helper}>Ask any roommate for the 10-letter-and-number code in Documents. The hyphen is optional.</Text>
               <Pressable accessibilityRole="button" disabled={submitting} onPress={() => void finishJoin(false)} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, submitting && styles.disabled]}>{submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Join a Nest</Text>}</Pressable>
             </>
@@ -160,6 +163,7 @@ export default function CreateJoinScreen() {
         </View>
       </Modal>
     </KeyboardAvoidingView>
+    </KeyboardDismissView>
   );
 }
 
