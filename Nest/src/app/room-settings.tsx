@@ -1,10 +1,11 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { toRoomError } from "@/features/rooms/errors";
 import { useRoom } from "@/features/rooms/RoomProvider";
 import type { RoomMember } from "@/features/rooms/types";
+import { confirmAction } from "@/lib/confirmAction";
 
 export default function RoomSettingsScreen() {
   const { regenerateInvite, removeMember, room, transferAdmin, user } = useRoom();
@@ -42,18 +43,17 @@ export default function RoomSettingsScreen() {
     }
   }
 
-  function confirmAction(member: RoomMember, action: "remove" | "transfer") {
+  function confirmMemberAction(member: RoomMember, action: "remove" | "transfer") {
     const transfer = action === "transfer";
-    Alert.alert(
-      transfer ? "Transfer admin access?" : "Remove roommate?",
-      transfer
+    confirmAction({
+      title: transfer ? "Transfer admin access?" : "Remove roommate?",
+      message: transfer
         ? `${member.displayName} will become the admin and you will become a regular member.`
         : `${member.displayName} will immediately lose access to this Nest and its shared data.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: transfer ? "Transfer" : "Remove", style: transfer ? "default" : "destructive", onPress: () => void runMemberAction(member, action) },
-      ],
-    );
+      confirmText: transfer ? "Transfer" : "Remove",
+      destructive: !transfer,
+      onConfirm: () => runMemberAction(member, action),
+    });
   }
 
   async function regenerate() {
@@ -88,7 +88,7 @@ export default function RoomSettingsScreen() {
             <View key={member.userId} style={[styles.memberRow, index < room.members.length - 1 && styles.divider]}>
               <View style={styles.memberCopy}><Text style={styles.memberName}>{member.displayName}{isSelf ? " (you)" : ""}</Text><Text style={styles.role}>{member.role === "admin" ? "Admin" : "Member"}</Text></View>
               {busyMember === member.userId ? <ActivityIndicator color="#28634E" /> : null}
-              {!isSelf && member.role !== "admin" && busyMember !== member.userId ? <View style={styles.actions}><Pressable onPress={() => confirmAction(member, "transfer")} style={styles.transferButton}><Text style={styles.transferText}>Make admin</Text></Pressable><Pressable onPress={() => confirmAction(member, "remove")} style={styles.removeButton}><Text style={styles.removeText}>Remove</Text></Pressable></View> : null}
+              {!isSelf && member.role !== "admin" && busyMember !== member.userId ? <View style={styles.actions}><Pressable onPress={() => confirmMemberAction(member, "transfer")} style={styles.transferButton}><Text style={styles.transferText}>Make admin</Text></Pressable><Pressable onPress={() => confirmMemberAction(member, "remove")} style={styles.removeButton}><Text style={styles.removeText}>Remove</Text></Pressable></View> : null}
             </View>
           );
         })}

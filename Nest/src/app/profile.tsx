@@ -5,6 +5,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSession } from "@/auth/ctx";
 import { toRoomError } from "@/features/rooms/errors";
 import { useRoom } from "@/features/rooms/RoomProvider";
+import { confirmAction } from "@/lib/confirmAction";
 
 // Typed as Href because the generated route types don't always include the
 // bare (room) group-index path.
@@ -16,53 +17,43 @@ export default function ProfileScreen() {
   const [leaving, setLeaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
-  const confirmLeave = () => Alert.alert(
-    "Leave this Nest?",
-    "You will lose access to this Nest's shared information. You can join another Nest later with its code.",
-    [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Leave Nest",
-        style: "destructive",
-        onPress: () => {
-          void (async () => {
-            setLeaving(true);
-            try {
-              await leaveNest();
-              router.replace("/create-join");
-            } catch (error) {
-              Alert.alert("Could not leave Nest", toRoomError(error).message);
-            } finally {
-              setLeaving(false);
-            }
-          })();
-        },
-      },
-    ],
-  );
+  const leaveCurrentNest = async () => {
+    setLeaving(true);
+    try {
+      await leaveNest();
+      router.replace("/create-join");
+    } catch (error) {
+      Alert.alert("Could not leave Nest", toRoomError(error).message);
+    } finally {
+      setLeaving(false);
+    }
+  };
 
-  const confirmSignOut = () => Alert.alert(
-    "Sign out of Nest?",
-    "You can log back in anytime with your email and password.",
-    [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign out",
-        style: "destructive",
-        onPress: () => {
-          void (async () => {
-            setSigningOut(true);
-            try {
-              await signOut();
-              router.replace("/(auth)/sign-in");
-            } finally {
-              setSigningOut(false);
-            }
-          })();
-        },
-      },
-    ],
-  );
+  const confirmLeave = () => confirmAction({
+    title: "Leave this Nest?",
+    message: "You will lose access to this Nest's shared information. You can join another Nest later with its code.",
+    confirmText: "Leave Nest",
+    destructive: true,
+    onConfirm: leaveCurrentNest,
+  });
+
+  const signOutCurrentUser = async () => {
+    setSigningOut(true);
+    try {
+      await signOut();
+      router.replace("/(auth)/sign-in");
+    } finally {
+      setSigningOut(false);
+    }
+  };
+
+  const confirmSignOut = () => confirmAction({
+    title: "Sign out of Nest?",
+    message: "You can log back in anytime with a code sent to your email.",
+    confirmText: "Sign out",
+    destructive: true,
+    onConfirm: signOutCurrentUser,
+  });
 
   return (
     <View style={styles.screen}>

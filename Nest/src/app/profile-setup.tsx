@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useSession } from "@/auth/ctx";
 import { validateFullName, validatePhone } from "@/auth/validation";
 import { FormField } from "@/components/FormField";
 import { FormScreen } from "@/components/FormScreen";
 import { PrimaryButton } from "@/components/PrimaryButton";
+import { confirmAction } from "@/lib/confirmAction";
 
 // Shown after the first successful login, before the app unlocks. Collects the
 // identity details roommates need to recognize each other.
@@ -23,14 +24,13 @@ export default function ProfileSetup() {
   const [submitting, setSubmitting] = useState(false);
 
   function confirmSignOut() {
-    Alert.alert(
-      "Sign out of Nest?",
-      "Your incomplete profile setup will stay unfinished until you log back in.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Sign out", style: "destructive", onPress: () => void signOut() },
-      ],
-    );
+    confirmAction({
+      title: "Sign out of Nest?",
+      message: "Your incomplete profile setup will stay unfinished until you log back in.",
+      confirmText: "Sign out",
+      destructive: true,
+      onConfirm: signOut,
+    });
   }
 
   async function handleSubmit() {
