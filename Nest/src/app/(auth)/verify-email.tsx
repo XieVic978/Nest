@@ -44,7 +44,7 @@ export default function VerifyEmail() {
   }
 
   return (
-    <FormScreen title={isRecovery ? "Enter your reset code" : "Check your email"} subtitle={`Enter the 8-digit code sent to ${email}. No browser link is needed.`}>
+    <FormScreen title={isRecovery ? "Enter your reset code" : "Check your email"} subtitle={`Enter the 8-digit code sent to ${email}. Check Spam if it is not in your inbox; no browser link is needed.`}>
       <FormField label="Verification code" value={code} onChangeText={setCode} keyboardType="number-pad" textContentType="oneTimeCode" maxLength={8} placeholder="12345678" />
       {isRecovery ? <><FormField label="New password" value={newPassword} onChangeText={setNewPassword} secureTextEntry autoComplete="new-password" textContentType="newPassword" placeholder="At least 8 characters" /><FormField label="Confirm new password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry autoComplete="new-password" textContentType="newPassword" placeholder="Enter it again" /></> : null}
       {formError ? <Text style={styles.error}>{formError}</Text> : null}

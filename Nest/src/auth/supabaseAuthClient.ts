@@ -74,11 +74,21 @@ async function fetchDocumentPinState(): Promise<boolean> {
 export const supabaseAuthClient: AuthClient = {
   async signUp(email, password): Promise<VoidResult> {
     const client = requireClient();
-    const { error } = await client.auth.signUp({
-      email: normalizeEmail(email),
+    const normalizedEmail = normalizeEmail(email);
+    const { data, error } = await client.auth.signUp({
+      email: normalizedEmail,
       password,
     });
     if (error) return { ok: false, error: error.message };
+
+    // Supabase returns a user without identities when this address already has
+    // an unconfirmed signup. Requesting another signup otherwise looks like it
+    // succeeded but does not necessarily send a fresh code. Resend one without
+    // exposing whether an account exists; the verification screen remains the
+    // same in either case.
+    if (data.user?.identities?.length === 0) {
+      await client.auth.resend({ type: "signup", email: normalizedEmail });
+    }
     return { ok: true };
   },
 
