@@ -49,3 +49,24 @@ export type NestGroceryItem = {
   purchasedAt: string | null;
   createdAt: string;
 };
+
+export type ExpensePaymentStatus = "open" | "pending" | "confirmed";
+
+export type NestExpenseParticipant = {
+  userId: string;
+  paymentStatus: ExpensePaymentStatus;
+};
+
+export type NestExpense = {
+  id: string;
+  roomId: string;
+  title: string;
+  amount: number;
+  date: string;
+  category: string;
+  description: string;
+  payerUserId: string;
+  createdByUserId: string;
+  createdAt: string;
+  participants: NestExpenseParticipant[];
+};
