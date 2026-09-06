@@ -14,14 +14,15 @@ interface FormFieldProps extends TextInputProps {
   error?: string | null;
 }
 
-export function FormField({ label, error, style, ...inputProps }: FormFieldProps) {
+export function FormField({ label, error, multiline, style, submitBehavior, ...inputProps }: FormFieldProps) {
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
-        blurOnSubmit
         returnKeyType="done"
+        multiline={multiline}
         style={[styles.input, error ? styles.inputError : null, style]}
+        submitBehavior={submitBehavior ?? (multiline ? "newline" : "blurAndSubmit")}
         placeholderTextColor="#9aa0a6"
         {...inputProps}
       />
