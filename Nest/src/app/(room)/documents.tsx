@@ -4,6 +4,7 @@ import { useFocusEffect } from "expo-router";
 import { Alert, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { useSession } from "@/auth/ctx";
+import { formatInviteCode } from "@/features/rooms/invite";
 import { useRoom } from "@/features/rooms/RoomProvider";
 import { useSharedNote } from "@/features/shared-data/useSharedNote";
 
@@ -64,7 +65,7 @@ export default function NotesScreen() {
 
   async function copyCode() {
     if (!nestJoinCode) return;
-    await Clipboard.setStringAsync(nestJoinCode);
+    await Clipboard.setStringAsync(formatInviteCode(nestJoinCode));
     setCodeCopied(true);
     setTimeout(() => setCodeCopied(false), 2_000);
   }
@@ -99,7 +100,7 @@ export default function NotesScreen() {
       <Pressable accessibilityRole="button" onPress={openReset} style={styles.resetLink}><Text style={styles.resetText}>Forgot your PIN? Reset it</Text></Pressable>
     </> : <>
       <Text style={styles.codeLabel}>PERMANENT NEST CODE</Text>
-      <Pressable accessibilityLabel="Copy permanent Nest code" accessibilityRole="button" onPress={() => void copyCode()} style={({ pressed }) => [styles.codeCard, pressed && styles.codePressed]}><View><Text style={styles.codeText}>{nestJoinCode ?? "Loading…"}</Text><Text style={styles.copyText}>{codeCopied ? "COPIED ✓" : "TAP TO COPY"}</Text></View><Text style={styles.copyIcon}>⧉</Text></Pressable>
+      <Pressable accessibilityLabel="Copy permanent Nest code" accessibilityRole="button" onPress={() => void copyCode()} style={({ pressed }) => [styles.codeCard, pressed && styles.codePressed]}><View><Text style={styles.codeText}>{nestJoinCode ? formatInviteCode(nestJoinCode) : "Loading…"}</Text><Text style={styles.copyText}>{codeCopied ? "COPIED ✓" : "TAP TO COPY"}</Text></View><Text style={styles.copyIcon}>⧉</Text></Pressable>
       <View style={styles.noteHeader}><View><Text style={styles.noteTitle}>Shared house note</Text><Text style={styles.noteSubtitle}>Everything saves automatically for your roommates.</Text></View><Text style={styles.saveState}>{saving ? "Saving…" : noteLoading ? "Loading…" : "Live"}</Text></View>
       {noteError ? <Text style={styles.error}>Couldn’t load the shared note: {noteError}</Text> : null}
       <TextInput accessibilityLabel="Shared house note" multiline onChangeText={(value) => { setDraft(value); setEdited(true); }} placeholder="Start writing anything your household needs to remember…" style={styles.noteInput} textAlignVertical="top" value={draft} />

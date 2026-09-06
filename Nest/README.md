@@ -64,6 +64,11 @@ view, share, and regenerate the room's shared 10-minute invitation. It keeps
 invite access isolated to the matching Nest and broadcasts regenerated invites
 to the other members through Supabase Realtime.
 
+`20260912000000_create_shared_expenses.sql` adds the shared payments ledger and
+per-roommate payment statuses. Expenses, balances, “mark as paid” requests, and
+payer confirmations update every signed-in member of the matching Nest through
+Supabase Realtime. Run this migration before testing the Payments tab.
+
 The authentication flow stores the display name in `profiles.full_name`, with
 the authenticated user ID as `profiles.id`. Email sign-in uses a six-digit OTP;
 first-time users are then routed to Profile Setup. In Supabase Authentication >
