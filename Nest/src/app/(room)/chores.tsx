@@ -141,7 +141,7 @@ function ChoresContent({ members, roomId, userId }: { members: RoomMember[]; roo
   };
   const toggleRotationMember = (member: string) => setRotation((current) => current.includes(member) ? current.filter((item) => item !== member) : [...current, member]);
 
-  return <View style={styles.screen}><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void refresh()} tintColor="#28634E" />}>
+  return <View style={styles.screen}><ScrollView contentContainerStyle={styles.content} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void refresh()} tintColor="#28634E" />}>
     <View style={styles.header}><View><Text style={styles.eyebrow}>Shared home</Text><Text style={styles.title}>Chores</Text></View><Pressable onPress={() => openForm()} style={styles.addButton}><Text style={styles.addButtonText}>+ Add</Text></Pressable></View>
     <Text style={styles.intro}>Keep the household moving, together.</Text>
     {error ? <Text style={styles.errorText}>Couldn’t load shared chores: {error}</Text> : null}

@@ -106,7 +106,7 @@ export default function CreateJoinScreen() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.content} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
         <Text style={styles.eyebrow}>WELCOME HOME</Text>
         <Text style={styles.title}>Create a new Nest or join a Nest</Text>
         <Text style={styles.body}>Bring your roommates and shared home life into one place.</Text>
