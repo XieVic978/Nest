@@ -1,515 +1,105 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  RefreshControl,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import { ActivityIndicator, Alert, Keyboard, Modal, Platform, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { useRoom } from "@/features/rooms/RoomProvider";
-import { KeyboardDismissView } from "@/components/KeyboardDismissView";
 import type { RoomMember } from "@/features/rooms/types";
-import type { ExpenseInput } from "@/features/shared-data/useExpenses";
+import type { ExpenseInput, ReceiptExpenseInput } from "@/features/shared-data/useExpenses";
 import { useExpenses } from "@/features/shared-data/useExpenses";
-import type { ExpensePaymentStatus, NestExpense } from "@/features/shared-data/types";
+import type { NestExpense, NestExpenseSettlement, NestPaymentContact } from "@/features/shared-data/types";
 
 const CATEGORIES = ["Food", "Utilities", "Rent", "Transport", "Other"] as const;
+const iso = (date: Date) => date.toISOString().slice(0, 10);
+const money = (amount: number) => `$${Math.abs(amount).toFixed(2)}`;
+const dateLabel = (date: string) => new Date(`${date}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+type Pair = { userId: string; amount: number };
 
-function messageFrom(caught: unknown) {
-  return typeof caught === "object" && caught && "message" in caught
-    ? String(caught.message)
-    : "Please try again.";
+function pairBalances(expenses: NestExpense[], settlements: NestExpenseSettlement[], userId: string, members: RoomMember[]) {
+  const totals = new Map(members.filter((member) => member.userId !== userId).map((member) => [member.userId, 0]));
+  const add = (id: string, value: number) => totals.set(id, (totals.get(id) ?? 0) + value);
+  expenses.forEach((expense) => {
+    expense.participants.forEach((participant) => {
+      if (participant.userId === expense.payerUserId || participant.paymentStatus === "confirmed") return;
+      const share = participant.shareAmount || (expense.participants.length ? expense.amount / expense.participants.length : 0);
+      if (expense.payerUserId === userId) add(participant.userId, -share);
+      if (participant.userId === userId) add(expense.payerUserId, share);
+    });
+  });
+  settlements.forEach((settlement) => {
+    if (settlement.payerUserId === userId) add(settlement.recipientUserId, -settlement.amount);
+    if (settlement.recipientUserId === userId) add(settlement.payerUserId, settlement.amount);
+  });
+  return [...totals.entries()].map(([userId, amount]) => ({ userId, amount: Math.round(amount * 100) / 100 })).filter((pair) => Math.abs(pair.amount) >= .01).sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
 }
 
 export default function Expenses() {
   const { room, user } = useRoom();
-
-  if (!room || !user) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>Join a Nest to share expenses</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <ExpensesContent
-      members={room.members}
-      roomId={room.room.id}
-      roomName={room.room.name}
-      userId={user.id}
-    />
-  );
+  if (!room || !user) return <SafeAreaView style={styles.safe}><Empty title="Join a Nest to share expenses" /></SafeAreaView>;
+  return <ExpensesContent members={room.members} roomId={room.room.id} roomName={room.room.name} userId={user.id} />;
 }
 
-function ExpensesContent({
-  members,
-  roomId,
-  roomName,
-  userId,
-}: {
-  members: RoomMember[];
-  roomId: string;
-  roomName: string;
-  userId: string;
-}) {
-  const { createExpense, error, expenses, loading, refresh, setPaymentStatus } = useExpenses(roomId);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState("All");
-  const memberNames = useMemo(
-    () => new Map(members.map((member) => [member.userId, member.displayName])),
-    [members],
-  );
-  const currentUserName = memberNames.get(userId) ?? "You";
-
-  const visibleExpenses = categoryFilter === "All"
-    ? expenses
-    : expenses.filter((expense) => expense.category === categoryFilter);
-
-  const netBalance = useMemo(() => expenses.reduce((balance, expense) => {
-    const share = expense.amount / expense.participants.length;
-    if (expense.payerUserId === userId) {
-      const openShares = expense.participants.filter(
-        (participant) => participant.userId !== userId && participant.paymentStatus !== "confirmed",
-      ).length;
-      return balance + share * openShares;
-    }
-
-    const currentParticipant = expense.participants.find((participant) => participant.userId === userId);
-    return currentParticipant && currentParticipant.paymentStatus !== "confirmed"
-      ? balance - share
-      : balance;
-  }, 0), [expenses, userId]);
-
-  const updatePayment = async (
-    expenseId: string,
-    participantUserId: string,
-    status: ExpensePaymentStatus,
-  ) => {
-    try {
-      await setPaymentStatus(expenseId, participantUserId, status);
-    } catch (caught) {
-      Alert.alert("Couldn’t update payment", messageFrom(caught));
-    }
-  };
-
-  const saveExpense = async (input: ExpenseInput) => {
-    try {
-      await createExpense(input);
-      setModalVisible(false);
-      return true;
-    } catch (caught) {
-      Alert.alert("Couldn’t save expense", messageFrom(caught));
-      return false;
-    }
-  };
-
-  const owe = Math.max(0, -netBalance);
-  const owed = Math.max(0, netBalance);
-
-  return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView
-        contentContainerStyle={styles.screen}
-        refreshControl={(
-          <RefreshControl
-            refreshing={loading}
-            onRefresh={() => void refresh()}
-            tintColor="#28634E"
-          />
-        )}
-      >
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.eyebrow}>{roomName.toUpperCase()}</Text>
-            <Text style={styles.title}>Shared expenses</Text>
-          </View>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{currentUserName.slice(0, 1).toUpperCase()}</Text>
-          </View>
-        </View>
-
-        <View style={styles.balanceGrid}>
-          <Balance label="What I owe" amount={owe} tone="rose" />
-          <Balance label="Owed to me" amount={owed} tone="green" />
-        </View>
-
-        <Pressable onPress={() => setModalVisible(true)} style={styles.add}>
-          <Text style={styles.addText}>+ Add expense</Text>
-        </Pressable>
-
-        <Text style={styles.section}>Transaction log</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
-          {["All", ...CATEGORIES].map((filter) => (
-            <Pressable
-              key={filter}
-              onPress={() => setCategoryFilter(filter)}
-              style={[styles.filter, categoryFilter === filter && styles.filterSelected]}
-            >
-              <Text style={[styles.filterText, categoryFilter === filter && styles.filterTextSelected]}>
-                {filter}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        {error ? <Text style={styles.error}>Couldn’t load shared expenses: {error}</Text> : null}
-        {loading && !expenses.length ? <ActivityIndicator color="#28634E" style={styles.loading} /> : null}
-        {!loading && !visibleExpenses.length ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>No shared expenses yet</Text>
-            <Text style={styles.emptyBody}>Record a bill and choose which roommates should split it.</Text>
-          </View>
-        ) : visibleExpenses.map((expense) => (
-          <ExpenseRow
-            key={expense.id}
-            expense={expense}
-            memberNames={memberNames}
-            currentUserId={userId}
-            onSetStatus={updatePayment}
-          />
-        ))}
-
-        <ExpenseForm
-          visible={modalVisible}
-          members={members}
-          currentUserId={userId}
-          onClose={() => setModalVisible(false)}
-          onSave={saveExpense}
-        />
-      </ScrollView>
-    </SafeAreaView>
-  );
+function ExpensesContent({ members, roomId, roomName, userId }: { members: RoomMember[]; roomId: string; roomName: string; userId: string }) {
+  const { contacts, createExpense, createReceiptExpense, error, expenses, loading, recordSettlement, refresh, settlements } = useExpenses(roomId);
+  const [adding, setAdding] = useState(false); const [addingReceipt, setAddingReceipt] = useState(false); const [settling, setSettling] = useState(false); const [filter, setFilter] = useState("All");
+  const names = useMemo(() => new Map(members.map((member) => [member.userId, member.displayName])), [members]);
+  const pairs = useMemo(() => pairBalances(expenses, settlements, userId, members), [expenses, settlements, userId, members]);
+  const net = pairs.reduce((sum, pair) => sum + pair.amount, 0);
+  const visible = filter === "All" ? expenses : expenses.filter((expense) => expense.category === filter);
+  const saveExpense = async (input: ExpenseInput) => { try { await createExpense(input); setAdding(false); return true; } catch (caught) { Alert.alert("Couldn’t save expense", caught instanceof Error ? caught.message : "Please try again."); return false; } };
+  const saveReceipt = async (input: ReceiptExpenseInput) => { try { await createReceiptExpense(input); setAddingReceipt(false); return true; } catch (caught) { Alert.alert("Couldn’t save receipt", caught instanceof Error ? caught.message : "Please try again."); return false; } };
+  const savePayment = async (recipient: string, amount: number, method: "venmo" | "zelle" | "other") => { try { await recordSettlement(recipient, amount, method, "Payment confirmed in Nest"); } catch (caught) { Alert.alert("Couldn’t record payment", caught instanceof Error ? caught.message : "Please try again."); throw caught; } };
+  const owed = net > .005; const receiving = net < -.005;
+  return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void refresh()} tintColor="#28634E" />}>
+    <View style={styles.header}><View><Text style={styles.eyebrow}>{roomName.toUpperCase()}</Text><Text style={styles.title}>Shared expenses</Text></View><View style={styles.avatar}><Text style={styles.avatarText}>{(names.get(userId) ?? "Y")[0]}</Text></View></View>
+    <Pressable onPress={() => setSettling(true)} style={[styles.net, owed ? styles.netOwe : receiving ? styles.netOwed : styles.netClear]}><View><Text style={styles.netLabel}>{owed ? "You owe" : receiving ? "You’re owed" : "All settled"}</Text><Text style={styles.netHint}>{pairs.length ? "Tap to see roommate balances" : "No open balances"}</Text></View><View style={styles.netRight}><Text style={styles.netAmount}>{money(net)}</Text><Text style={styles.arrow}>›</Text></View></Pressable>
+    <Pressable onPress={() => setAdding(true)} style={styles.add}><Text style={styles.addText}>+ Add expense</Text></Pressable>
+    <Pressable onPress={() => setAddingReceipt(true)} style={styles.receiptButton}><Text style={styles.receiptButtonText}>Upload grocery list</Text></Pressable>
+    <Text style={styles.section}>Transaction log</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>{["All", ...CATEGORIES].map((item) => <Pressable key={item} onPress={() => setFilter(item)} style={[styles.filter, filter === item && styles.filterOn]}><Text style={[styles.filterText, filter === item && styles.filterTextOn]}>{item}</Text></Pressable>)}</ScrollView>
+    {error ? <Text style={styles.error}>Couldn’t load shared expenses: {error}</Text> : null}{loading && !expenses.length ? <ActivityIndicator color="#28634E" style={styles.loading} /> : null}
+    {!loading && !visible.length ? <Empty title="No shared expenses yet" body="Add the first household expense to start settling up." /> : visible.map((expense) => <ExpenseRow key={expense.id} expense={expense} names={names} />)}
+    {settlements.length ? <><Text style={styles.section}>Confirmed payments</Text>{settlements.slice(0, 8).map((settlement) => <View key={settlement.id} style={styles.history}><Text style={styles.historyText}>{names.get(settlement.payerUserId) ?? "A roommate"} paid {names.get(settlement.recipientUserId) ?? "a roommate"}</Text><Text style={styles.historyAmount}>{money(settlement.amount)}</Text></View>)}</> : null}
+    <ExpenseForm visible={adding} members={members} userId={userId} onClose={() => setAdding(false)} onSave={saveExpense} />
+    <ReceiptForm visible={addingReceipt} members={members} onClose={() => setAddingReceipt(false)} onSave={saveReceipt} />
+    <SettleSheet visible={settling} pairs={pairs} contacts={contacts} names={names} onClose={() => setSettling(false)} onSave={savePayment} />
+  </ScrollView></SafeAreaView>;
 }
 
-function Balance({ label, amount, tone }: { label: string; amount: number; tone: "rose" | "green" }) {
-  return (
-    <View style={[styles.balance, tone === "rose" ? styles.rose : styles.green]}>
-      <Text style={styles.balanceLabel}>{label}</Text>
-      <Text style={styles.balanceAmount}>${amount.toFixed(2)}</Text>
-      <Text style={styles.balanceHint}>{amount ? "across open bills" : "all clear"}</Text>
-    </View>
-  );
+function ExpenseRow({ expense, names }: { expense: NestExpense; names: Map<string, string> }) { const share = expense.participants.length ? expense.amount / expense.participants.length : 0; return <View style={styles.expense}><View style={styles.expenseTop}><View style={styles.icon}><Text>↗</Text></View><View style={styles.expenseMain}><Text style={styles.expenseTitle}>{expense.title}</Text><Text style={styles.meta}>{expense.category} · {dateLabel(expense.date)} · Paid by {names.get(expense.payerUserId) ?? "Former member"}</Text></View><Text style={styles.amount}>{money(expense.amount)}</Text></View><Text style={styles.split}>{expense.participants.map((person) => names.get(person.userId) ?? "Former member").join(", ")} · {money(share)} each</Text>{expense.description ? <Text style={styles.description}>{expense.description}</Text> : null}</View>; }
+function Empty({ title, body }: { title: string; body?: string }) { return <View style={styles.empty}><Text style={styles.emptyTitle}>{title}</Text>{body ? <Text style={styles.emptyBody}>{body}</Text> : null}</View>; }
+
+function SettleSheet({ visible, pairs, contacts, names, onClose, onSave }: { visible: boolean; pairs: Pair[]; contacts: NestPaymentContact[]; names: Map<string, string>; onClose: () => void; onSave: (recipient: string, amount: number, method: "venmo" | "zelle" | "other") => Promise<void> }) {
+  const [selected, setSelected] = useState<Pair | null>(null); const close = () => { Keyboard.dismiss(); setSelected(null); onClose(); };
+  return <Modal visible={visible} transparent animationType="slide" onRequestClose={close}><View style={styles.backdrop}><View style={styles.sheet}><View style={styles.sheetHeader}><Text style={styles.sheetTitle}>{selected ? names.get(selected.userId) ?? "Roommate" : "Settle up"}</Text><Pressable onPress={close}><Text style={styles.close}>Close</Text></Pressable></View>{selected ? <PaymentForm pair={selected} contact={contacts.find((item) => item.userId === selected.userId) ?? null} name={names.get(selected.userId) ?? "Roommate"} onBack={() => setSelected(null)} onSave={async (amount, method) => { await onSave(selected.userId, amount, method); setSelected(null); }} /> : <ScrollView><Text style={styles.sheetBody}>Totals are netted across every shared expense and confirmed payment.</Text>{pairs.length ? pairs.map((pair) => <Pressable key={pair.userId} onPress={() => setSelected(pair)} style={styles.personRow}><View><Text style={styles.personName}>{names.get(pair.userId) ?? "Former member"}</Text><Text style={[styles.direction, pair.amount > 0 ? styles.red : styles.green]}>{pair.amount > 0 ? "You owe" : "Owes you"}</Text></View><View style={styles.personRight}><Text style={[styles.personAmount, pair.amount > 0 ? styles.red : styles.green]}>{money(pair.amount)}</Text><Text style={styles.arrow}>›</Text></View></Pressable>) : <Empty title="You’re all settled up" />}</ScrollView>}</View></View></Modal>;
 }
 
-function ExpenseRow({
-  expense,
-  memberNames,
-  currentUserId,
-  onSetStatus,
-}: {
-  expense: NestExpense;
-  memberNames: Map<string, string>;
-  currentUserId: string;
-  onSetStatus: (expenseId: string, participantUserId: string, status: ExpensePaymentStatus) => Promise<void>;
-}) {
-  const [busyUserId, setBusyUserId] = useState<string | null>(null);
-  const share = expense.amount / expense.participants.length;
-  const currentPayment = expense.participants.find(
-    (participant) => participant.userId === currentUserId,
-  )?.paymentStatus;
-  const isReceiver = expense.payerUserId === currentUserId;
-  const isDebtor = Boolean(currentPayment) && !isReceiver;
-  const pendingPayers = expense.participants.filter(
-    (participant) => participant.userId !== expense.payerUserId && participant.paymentStatus === "pending",
-  );
-  const displayName = (participantUserId: string) => memberNames.get(participantUserId) ?? "Former member";
-
-  const changeStatus = async (participantUserId: string, status: ExpensePaymentStatus) => {
-    setBusyUserId(participantUserId);
-    try {
-      await onSetStatus(expense.id, participantUserId, status);
-    } finally {
-      setBusyUserId(null);
-    }
-  };
-
-  return (
-    <View style={styles.expense}>
-      <View style={styles.expenseTop}>
-        <View style={styles.expenseIcon}><Text>↗</Text></View>
-        <View style={styles.expenseMain}>
-          <Text style={styles.expenseTitle}>{expense.title}</Text>
-          <Text style={styles.expenseMeta}>
-            {expense.category} · {expense.date} · Paid by {displayName(expense.payerUserId)}
-          </Text>
-        </View>
-        <Text style={styles.amount}>${expense.amount.toFixed(2)}</Text>
-      </View>
-
-      <Text style={styles.split}>
-        {expense.participants.map((participant) => displayName(participant.userId)).join(", ")} · ${share.toFixed(2)} each
-      </Text>
-      {expense.description ? <Text style={styles.description}>{expense.description}</Text> : null}
-
-      {isDebtor ? (
-        <View style={styles.expenseBottom}>
-          {currentPayment === "open" ? (
-            <Pressable
-              disabled={busyUserId === currentUserId}
-              onPress={() => void changeStatus(currentUserId, "pending")}
-              style={styles.settle}
-            >
-              <Text style={styles.settleText}>
-                {busyUserId === currentUserId ? "Updating…" : "Mark as paid"}
-              </Text>
-            </Pressable>
-          ) : (
-            <Text style={[styles.status, currentPayment === "confirmed" && styles.settled]}>
-              {currentPayment === "pending" ? "Awaiting recipient confirmation" : "Payment confirmed"}
-            </Text>
-          )}
-        </View>
-      ) : null}
-
-      {isReceiver && pendingPayers.map((participant) => (
-        <View key={participant.userId} style={styles.expenseBottom}>
-          <Text style={styles.expenseMeta}>
-            {displayName(participant.userId)} marked ${share.toFixed(2)} as paid
-          </Text>
-          <Pressable
-            disabled={busyUserId === participant.userId}
-            onPress={() => void changeStatus(participant.userId, "confirmed")}
-            style={styles.settle}
-          >
-            <Text style={styles.settleText}>Confirm</Text>
-          </Pressable>
-          <Pressable
-            disabled={busyUserId === participant.userId}
-            onPress={() => void changeStatus(participant.userId, "open")}
-            style={styles.filter}
-          >
-            <Text style={styles.filterText}>Not received</Text>
-          </Pressable>
-        </View>
-      ))}
-    </View>
-  );
+function PaymentForm({ pair, contact, name, onBack, onSave }: { pair: Pair; contact: NestPaymentContact | null; name: string; onBack: () => void; onSave: (amount: number, method: "venmo" | "zelle" | "other") => Promise<void> }) {
+  const [mode, setMode] = useState<"choose" | "full" | "partial">("choose"); const [partial, setPartial] = useState(""); const [method, setMethod] = useState<"venmo" | "zelle" | "other">(contact?.venmo ? "venmo" : contact?.zelle ? "zelle" : "other"); const [saving, setSaving] = useState(false); const owed = pair.amount;
+  if (owed <= 0) return <View><Text style={styles.sheetBody}>{name} currently owes you {money(owed * -1)}. Their balance will update after they record a payment.</Text><Pressable onPress={onBack} style={styles.secondary}><Text style={styles.secondaryText}>Back to balances</Text></Pressable></View>;
+  const amount = mode === "full" ? owed : Number(partial); const valid = Number.isFinite(amount) && amount > 0 && amount <= owed;
+  const submit = async () => { if (!valid) return; setSaving(true); try { await onSave(amount, method); Alert.alert("Payment recorded", `${money(amount)} was recorded as paid to ${name}.`); } finally { setSaving(false); } };
+  const confirm = () => Alert.alert("Confirm payment?", `Only continue after you have paid ${name} ${money(amount)} outside Nest. Nest will record this as a trusted payment.`, [{ text: "Cancel", style: "cancel" }, { text: "Confirm payment", onPress: () => void submit() }]);
+  if (mode === "choose") return <View><Text style={styles.sheetBody}>You owe {name} {money(owed)}.</Text><Pressable onPress={() => setMode("full")} style={styles.save}><Text style={styles.saveText}>Pay in full · {money(owed)}</Text></Pressable><Pressable onPress={() => setMode("partial")} style={styles.secondary}><Text style={styles.secondaryText}>Pay a partial amount</Text></Pressable></View>;
+  return <ScrollView keyboardShouldPersistTaps="handled"><Pressable onPress={() => setMode("choose")}><Text style={styles.backLink}>‹ Back</Text></Pressable><Text style={styles.owedAmount}>Amount owed: {money(owed)}</Text>{mode === "partial" ? <><Text style={styles.label}>AMOUNT YOU ARE PAYING</Text><TextInput value={partial} onChangeText={setPartial} keyboardType="decimal-pad" placeholder="0.00" style={styles.input} /><Pressable onPress={Keyboard.dismiss}><Text style={styles.done}>Done typing</Text></Pressable></> : <Text style={styles.sheetBody}>You are recording a full payment of {money(owed)}.</Text>}<Text style={styles.label}>PAYMENT DETAILS</Text>{contact?.venmo ? <Text style={styles.info}>Venmo: {contact.venmo}</Text> : null}{contact?.zelle ? <Text style={styles.info}>Zelle: {contact.zelle}</Text> : null}{contact?.phone ? <Text style={styles.info}>Phone: {contact.phone}</Text> : null}{!contact?.venmo && !contact?.zelle ? <Text style={styles.none}>This person has no payment info to display.</Text> : null}<Text style={styles.instructions}>Pay {name} using their Venmo or Zelle details, then confirm below. Nest tracks the payment you report; it does not send money itself.</Text><View style={styles.methods}>{(["venmo", "zelle", "other"] as const).map((item) => <Pressable key={item} onPress={() => setMethod(item)} style={[styles.method, method === item && styles.methodOn]}><Text style={styles.methodText}>{item === "other" ? "Other" : item[0].toUpperCase() + item.slice(1)}</Text></Pressable>)}</View><Pressable disabled={!valid || saving} onPress={confirm} style={[styles.save, (!valid || saving) && styles.disabled]}><Text style={styles.saveText}>{saving ? "Recording…" : "Confirm payment"}</Text></Pressable></ScrollView>;
 }
 
-function ExpenseForm({
-  visible,
-  members,
-  currentUserId,
-  onClose,
-  onSave,
-}: {
-  visible: boolean;
-  members: RoomMember[];
-  currentUserId: string;
-  onClose: () => void;
-  onSave: (expense: ExpenseInput) => Promise<boolean>;
-}) {
-  const [title, setTitle] = useState("");
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState<(typeof CATEGORIES)[number]>("Food");
-  const [payerUserId, setPayerUserId] = useState(currentUserId);
-  const [description, setDescription] = useState("");
-  const [participantUserIds, setParticipantUserIds] = useState<string[]>([currentUserId]);
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [saving, setSaving] = useState(false);
-
-  const close = () => {
-    Keyboard.dismiss();
-    onClose();
-  };
-
-  useEffect(() => {
-    if (visible) {
-      setPayerUserId(currentUserId);
-      setParticipantUserIds([currentUserId]);
-    }
-  }, [currentUserId, visible]);
-
-  const toggleParticipant = (participantUserId: string) => {
-    setParticipantUserIds((current) => current.includes(participantUserId)
-      ? current.filter((entry) => entry !== participantUserId)
-      : [...current, participantUserId]);
-  };
-
-  const submit = async () => {
-    const numericAmount = Number(amount);
-    const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date)
-      && !Number.isNaN(new Date(`${date}T00:00:00`).getTime());
-    const selectedPeople = participantUserIds.includes(payerUserId)
-      ? participantUserIds
-      : [...participantUserIds, payerUserId];
-
-    if (!title.trim() || !Number.isFinite(numericAmount) || numericAmount <= 0 || !validDate || !payerUserId) {
-      Alert.alert("Complete the expense", "Add a title, positive amount, valid date, and payer.");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const saved = await onSave({
-        title: title.trim(),
-        amount: numericAmount,
-        date,
-        category,
-        description: description.trim(),
-        payerUserId,
-        participantUserIds: selectedPeople,
-      });
-      if (saved) {
-        setTitle("");
-        setAmount("");
-        setDescription("");
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={close}>
-      <KeyboardDismissView>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.backdrop}
-      >
-        <View style={styles.sheet}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Add expense</Text>
-            <Pressable onPress={close}><Text style={styles.close}>Close</Text></Pressable>
-          </View>
-          <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
-            <Text style={styles.label}>TITLE</Text>
-            <TextInput enterKeyHint="done" onSubmitEditing={Keyboard.dismiss} value={title} onChangeText={setTitle} placeholder="e.g. Internet bill" style={styles.input} />
-            <Text style={styles.label}>AMOUNT</Text>
-            <TextInput enterKeyHint="done" onSubmitEditing={Keyboard.dismiss} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" style={styles.input} />
-            <Text style={styles.label}>DATE</Text>
-            <TextInput enterKeyHint="done" onSubmitEditing={Keyboard.dismiss} value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" style={styles.input} />
-            <Text style={styles.label}>CATEGORY</Text>
-            <ScrollView horizontal contentContainerStyle={styles.filters}>
-              {CATEGORIES.map((option) => (
-                <Pressable
-                  key={option}
-                  onPress={() => setCategory(option)}
-                  style={[styles.filter, category === option && styles.filterSelected]}
-                >
-                  <Text style={[styles.filterText, category === option && styles.filterTextSelected]}>{option}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-            <Text style={styles.label}>PAID BY</Text>
-            <PeoplePicker members={members} selected={payerUserId} onSelect={setPayerUserId} />
-            <Text style={styles.label}>SPLIT WITH</Text>
-            <View style={styles.people}>
-              {members.map((member) => (
-                <Pressable
-                  key={member.userId}
-                  onPress={() => toggleParticipant(member.userId)}
-                  style={[styles.person, participantUserIds.includes(member.userId) && styles.personSelected]}
-                >
-                  <Text style={styles.personText}>{member.displayName}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text style={styles.label}>DESCRIPTION</Text>
-            <TextInput value={description} onChangeText={setDescription} placeholder="Optional note" style={[styles.input, styles.descriptionInput]} multiline />
-            <Pressable disabled={saving} onPress={() => void submit()} style={[styles.save, saving && styles.disabled]}>
-              <Text style={styles.saveText}>{saving ? "Saving…" : "Save expense"}</Text>
-            </Pressable>
-          </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
-      </KeyboardDismissView>
-    </Modal>
-  );
+function ExpenseForm({ visible, members, userId, onClose, onSave }: { visible: boolean; members: RoomMember[]; userId: string; onClose: () => void; onSave: (input: ExpenseInput) => Promise<boolean> }) {
+  const [title, setTitle] = useState(""); const [amount, setAmount] = useState(""); const [category, setCategory] = useState<(typeof CATEGORIES)[number]>("Food"); const [description, setDescription] = useState(""); const [people, setPeople] = useState<string[]>(members.map((member) => member.userId)); const [date, setDate] = useState(iso(new Date())); const [picker, setPicker] = useState(false); const [saving, setSaving] = useState(false);
+  useEffect(() => { if (visible) { setPeople(members.map((member) => member.userId)); setDate(iso(new Date())); } }, [visible, members]);
+  const submit = async () => { const numericAmount = Number(amount); if (!title.trim() || !Number.isFinite(numericAmount) || numericAmount <= 0 || !people.length) { Alert.alert("Complete the expense", "Add a title, positive amount, and at least one person to split with."); return; } setSaving(true); try { const saved = await onSave({ title, amount: numericAmount, date, category, description, payerUserId: userId, participantUserIds: people }); if (saved) { setTitle(""); setAmount(""); setDescription(""); } } finally { setSaving(false); } };
+  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}><View style={styles.backdrop}><View style={styles.sheet}><View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Add expense</Text><Pressable onPress={onClose}><Text style={styles.close}>Close</Text></Pressable></View><ScrollView keyboardShouldPersistTaps="handled"><Text style={styles.label}>TITLE</Text><TextInput value={title} onChangeText={setTitle} placeholder="e.g. Internet bill" style={styles.input} /><Text style={styles.label}>AMOUNT</Text><TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" style={styles.input} /><Text style={styles.label}>DATE</Text><Pressable onPress={() => setPicker(true)} style={styles.dateButton}><Text style={styles.dateText}>{dateLabel(date)}</Text><Text style={styles.dateIcon}>▣</Text></Pressable><Text style={styles.label}>CATEGORY</Text><ScrollView horizontal contentContainerStyle={styles.filters}>{CATEGORIES.map((item) => <Pressable key={item} onPress={() => setCategory(item)} style={[styles.filter, category === item && styles.filterOn]}><Text style={[styles.filterText, category === item && styles.filterTextOn]}>{item}</Text></Pressable>)}</ScrollView><Text style={styles.paid}>Paid by you</Text><Text style={styles.label}>SPLIT WITH</Text><View style={styles.people}>{members.map((member) => <Pressable key={member.userId} onPress={() => setPeople((current) => current.includes(member.userId) ? current.filter((id) => id !== member.userId) : [...current, member.userId])} style={[styles.chip, people.includes(member.userId) && styles.chipOn]}><Text style={styles.chipText}>{member.displayName}</Text></Pressable>)}</View><Text style={styles.label}>DESCRIPTION</Text><TextInput value={description} onChangeText={setDescription} placeholder="Optional note" multiline style={[styles.input, styles.descriptionInput]} /><Pressable disabled={saving} onPress={() => void submit()} style={[styles.save, saving && styles.disabled]}><Text style={styles.saveText}>{saving ? "Saving…" : "Save expense"}</Text></Pressable></ScrollView></View></View><CalendarPicker visible={picker} value={date} onClose={() => setPicker(false)} onPick={(value) => { setDate(value); setPicker(false); }} /></Modal>;
 }
 
-function PeoplePicker({
-  members,
-  selected,
-  onSelect,
-}: {
-  members: RoomMember[];
-  selected: string;
-  onSelect: (userId: string) => void;
-}) {
-  return (
-    <View style={styles.people}>
-      {members.map((member) => (
-        <Pressable
-          key={member.userId}
-          onPress={() => onSelect(member.userId)}
-          style={[styles.person, selected === member.userId && styles.personSelected]}
-        >
-          <Text style={styles.personText}>{member.displayName}</Text>
-        </Pressable>
-      ))}
-    </View>
-  );
+function ReceiptForm({ visible, members, onClose, onSave }: { visible: boolean; members: RoomMember[]; onClose: () => void; onSave: (input: ReceiptExpenseInput) => Promise<boolean> }) {
+  const [title, setTitle] = useState("Grocery receipt"); const [date, setDate] = useState(iso(new Date())); const [picker, setPicker] = useState(false); const [photoName, setPhotoName] = useState<string | null>(null); const [items, setItems] = useState([{ id: "first", name: "", amount: "", assignedUserId: null as string | null }]); const [saving, setSaving] = useState(false);
+  useEffect(() => { if (visible) { setDate(iso(new Date())); setPhotoName(null); setItems([{ id: "first", name: "", amount: "", assignedUserId: null }]); } }, [visible]);
+  const choosePhoto = async () => { const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: .7 }); if (!result.canceled) setPhotoName(result.assets[0]?.fileName ?? "Receipt photo selected"); };
+  const update = (id: string, patch: Partial<(typeof items)[number]>) => setItems((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
+  const submit = async () => { const clean = items.map((item) => ({ name: item.name.trim(), amount: Number(item.amount), assignedUserId: item.assignedUserId })).filter((item) => item.name && Number.isFinite(item.amount) && item.amount >= 0); const total = clean.reduce((sum, item) => sum + item.amount, 0); if (!title.trim() || !clean.length || total <= 0) { Alert.alert("Add grocery items", "Add at least one item with a price."); return; } setSaving(true); try { await onSave({ title: title.trim(), amount: total, date, description: photoName ? "Grocery receipt photo selected" : "Manual grocery list", participantUserIds: members.map((member) => member.userId), items: clean }); } finally { setSaving(false); } };
+  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}><View style={styles.backdrop}><View style={styles.sheet}><View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Grocery receipt</Text><Pressable onPress={onClose}><Text style={styles.close}>Close</Text></Pressable></View><ScrollView keyboardShouldPersistTaps="handled"><Text style={styles.sheetBody}>Upload a receipt photo or enter grocery items manually. An item assigned to one roommate is charged fully to them; shared items split across everyone.</Text><Pressable onPress={() => void choosePhoto()} style={styles.secondary}><Text style={styles.secondaryText}>{photoName ?? "Choose receipt photo"}</Text></Pressable><Text style={styles.label}>RECEIPT TITLE</Text><TextInput value={title} onChangeText={setTitle} style={styles.input} /><Text style={styles.label}>DATE</Text><Pressable onPress={() => setPicker(true)} style={styles.dateButton}><Text style={styles.dateText}>{dateLabel(date)}</Text><Text style={styles.dateIcon}>▣</Text></Pressable><Text style={styles.label}>GROCERY ITEMS</Text>{items.map((item) => <View key={item.id} style={styles.receiptItem}><TextInput value={item.name} onChangeText={(name) => update(item.id, { name })} placeholder="Item name" style={styles.itemName} /><TextInput value={item.amount} onChangeText={(amount) => update(item.id, { amount })} placeholder="0.00" keyboardType="decimal-pad" style={styles.itemAmount} /><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.itemPeople}><Pressable onPress={() => update(item.id, { assignedUserId: null })} style={[styles.itemPerson, !item.assignedUserId && styles.chipOn]}><Text style={styles.chipText}>Split all</Text></Pressable>{members.map((member) => <Pressable key={member.userId} onPress={() => update(item.id, { assignedUserId: member.userId })} style={[styles.itemPerson, item.assignedUserId === member.userId && styles.chipOn]}><Text style={styles.chipText}>{member.displayName}</Text></Pressable>)}</ScrollView></View>)}<Pressable onPress={() => setItems((current) => [...current, { id: `${Date.now()}-${current.length}`, name: "", amount: "", assignedUserId: null }])} style={styles.addItem}><Text style={styles.secondaryText}>+ Add item</Text></Pressable><Pressable disabled={saving} onPress={() => void submit()} style={[styles.save, saving && styles.disabled]}><Text style={styles.saveText}>{saving ? "Saving…" : "Add receipt to transaction log"}</Text></Pressable></ScrollView></View></View><CalendarPicker visible={picker} value={date} onClose={() => setPicker(false)} onPick={(value) => { setDate(value); setPicker(false); }} /></Modal>;
 }
+
+function CalendarPicker({ visible, value, onClose, onPick }: { visible: boolean; value: string; onClose: () => void; onPick: (value: string) => void; }) { const [month, setMonth] = useState(new Date(`${value}T00:00:00`)); useEffect(() => { if (visible) setMonth(new Date(`${value}T00:00:00`)); }, [visible, value]); const year = month.getFullYear(); const monthIndex = month.getMonth(); const first = new Date(year, monthIndex, 1).getDay(); const count = new Date(year, monthIndex + 1, 0).getDate(); const days = Array.from({ length: first + count }, (_, index) => index < first ? null : index - first + 1); return <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}><View style={styles.calendarOverlay}><View style={styles.calendar}><View style={styles.calendarHeader}><Pressable onPress={() => setMonth(new Date(year, monthIndex - 1, 1))}><Text style={styles.calendarArrow}>‹</Text></Pressable><Text style={styles.calendarMonth}>{month.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</Text><Pressable onPress={() => setMonth(new Date(year, monthIndex + 1, 1))}><Text style={styles.calendarArrow}>›</Text></Pressable></View><View style={styles.calendarGrid}>{days.map((day, index) => day === null ? <View key={`blank-${index}`} style={styles.calendarDay} /> : <Pressable key={day} onPress={() => onPick(iso(new Date(year, monthIndex, day)))} style={[styles.calendarDay, value === iso(new Date(year, monthIndex, day)) && styles.calendarDayOn]}><Text style={[styles.calendarDayText, value === iso(new Date(year, monthIndex, day)) && styles.calendarDayTextOn]}>{day}</Text></Pressable>)}</View><Pressable onPress={onClose} style={styles.cancel}><Text style={styles.close}>Cancel</Text></Pressable></View></View></Modal>; }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F7F5EF" },
-  screen: { padding: 24, paddingBottom: 50 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: Platform.OS === "web" ? 16 : 0 },
-  eyebrow: { color: "#6E7F69", fontSize: 11, fontWeight: "700", letterSpacing: 1.6 },
-  title: { color: "#20231F", fontSize: 32, fontWeight: "800", marginTop: 5 },
-  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: "#D4E0C6", alignItems: "center", justifyContent: "center" },
-  avatarText: { color: "#35513A", fontWeight: "800", fontSize: 17 },
-  balanceGrid: { flexDirection: "row", gap: 12, marginTop: 22 },
-  balance: { flex: 1, borderRadius: 16, padding: 16 },
-  rose: { backgroundColor: "#F1E1DA" },
-  green: { backgroundColor: "#E4EAD9" },
-  balanceLabel: { color: "#60645B", fontSize: 12, fontWeight: "700" },
-  balanceAmount: { color: "#29332A", fontSize: 25, fontWeight: "800", marginTop: 9 },
-  balanceHint: { color: "#7D8176", fontSize: 11, marginTop: 3 },
-  add: { backgroundColor: "#263D2C", padding: 15, borderRadius: 12, alignItems: "center", marginTop: 14 },
-  addText: { color: "#FFFDF8", fontWeight: "800" },
-  section: { color: "#73776D", fontSize: 12, fontWeight: "800", letterSpacing: 1.2, marginTop: 27, marginBottom: 10, textTransform: "uppercase" },
-  filters: { gap: 8, paddingBottom: 12 },
-  filter: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 9, borderWidth: 1, borderColor: "#D8D9CF" },
-  filterSelected: { backgroundColor: "#DCE8D3", borderColor: "#8FA584" },
-  filterText: { color: "#73776D", fontSize: 12, fontWeight: "700" },
-  filterTextSelected: { color: "#35513A" },
-  error: { color: "#A13D32", fontSize: 12, lineHeight: 18, marginBottom: 12 },
-  loading: { marginTop: 45 },
-  expense: { backgroundColor: "#FFFDF8", borderRadius: 16, padding: 15, marginBottom: 10, borderWidth: 1, borderColor: "#ECE9DF" },
-  expenseTop: { flexDirection: "row", alignItems: "center" },
-  expenseIcon: { width: 35, height: 35, borderRadius: 10, backgroundColor: "#E8F0E1", alignItems: "center", justifyContent: "center" },
-  expenseMain: { flex: 1, marginLeft: 10 },
-  expenseTitle: { color: "#252821", fontWeight: "800", fontSize: 16 },
-  expenseMeta: { color: "#888B81", fontSize: 11, marginTop: 3, flex: 1 },
-  amount: { color: "#29332A", fontWeight: "800" },
-  split: { color: "#596156", fontSize: 12, marginTop: 13 },
-  description: { color: "#777970", fontSize: 12, marginTop: 7 },
-  expenseBottom: { flexDirection: "row", gap: 8, alignItems: "center", marginTop: 13 },
-  status: { color: "#A6675E", fontSize: 11, fontWeight: "800" },
-  settled: { color: "#577050" },
-  settle: { backgroundColor: "#E8F0E1", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
-  settleText: { color: "#577050", fontSize: 12, fontWeight: "800" },
-  empty: { alignItems: "center", paddingVertical: 55 },
-  emptyTitle: { color: "#252821", fontSize: 18, fontWeight: "800" },
-  emptyBody: { color: "#777970", fontSize: 13, textAlign: "center", marginTop: 8 },
-  backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(28,34,27,.35)" },
-  sheet: { backgroundColor: "#F7F5EF", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: "92%" },
-  modalHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 18 },
-  modalTitle: { color: "#252821", fontSize: 24, fontWeight: "800" },
-  close: { color: "#577050", fontWeight: "700" },
-  label: { color: "#777970", fontSize: 11, fontWeight: "800", letterSpacing: 1, marginTop: 11, marginBottom: 7 },
-  input: { backgroundColor: "#FFFDF8", borderColor: "#E1DED3", borderWidth: 1, borderRadius: 11, padding: 12, fontSize: 15, color: "#252821" },
-  people: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  person: { borderWidth: 1, borderColor: "#D8D9CF", paddingHorizontal: 13, paddingVertical: 9, borderRadius: 9 },
-  personSelected: { backgroundColor: "#DCE8D3", borderColor: "#8FA584" },
-  personText: { color: "#596156", fontWeight: "700", fontSize: 12 },
-  descriptionInput: { minHeight: 65, textAlignVertical: "top" },
-  save: { backgroundColor: "#263D2C", padding: 15, borderRadius: 12, alignItems: "center", marginTop: 22, marginBottom: 12 },
-  saveText: { color: "#FFFDF8", fontWeight: "800" },
-  disabled: { opacity: 0.55 },
+  safe: { flex: 1, backgroundColor: "#F7F5EF" }, screen: { padding: 24, paddingBottom: 50 }, header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: Platform.OS === "web" ? 16 : 0 }, eyebrow: { color: "#6E7F69", fontSize: 11, fontWeight: "700", letterSpacing: 1.6 }, title: { color: "#20231F", fontSize: 32, fontWeight: "800", marginTop: 5 }, avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: "#D4E0C6", alignItems: "center", justifyContent: "center" }, avatarText: { color: "#35513A", fontWeight: "800", fontSize: 17 }, net: { borderRadius: 16, marginTop: 22, padding: 17, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, netOwe: { backgroundColor: "#F9E3DF" }, netOwed: { backgroundColor: "#DDF0E5" }, netClear: { backgroundColor: "#E8ECE7" }, netLabel: { color: "#3A493D", fontSize: 14, fontWeight: "800" }, netHint: { color: "#64716B", fontSize: 11, marginTop: 4 }, netRight: { flexDirection: "row", alignItems: "center", gap: 8 }, netAmount: { color: "#18251F", fontSize: 25, fontWeight: "900" }, arrow: { color: "#28634E", fontSize: 27 }, add: { backgroundColor: "#263D2C", padding: 15, borderRadius: 12, alignItems: "center", marginTop: 14 }, addText: { color: "#FFFDF8", fontWeight: "800" }, receiptButton: { alignItems: "center", marginTop: 12, padding: 8 }, receiptButtonText: { color: "#28634E", fontWeight: "800" }, section: { color: "#73776D", fontSize: 12, fontWeight: "800", letterSpacing: 1.2, marginTop: 27, marginBottom: 10, textTransform: "uppercase" }, filters: { gap: 8, paddingBottom: 12 }, filter: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 9, borderWidth: 1, borderColor: "#D8D9CF" }, filterOn: { backgroundColor: "#DCE8D3", borderColor: "#8FA584" }, filterText: { color: "#73776D", fontSize: 12, fontWeight: "700" }, filterTextOn: { color: "#35513A" }, error: { color: "#A13D32", fontSize: 12, marginBottom: 12 }, loading: { marginTop: 45 }, empty: { alignItems: "center", paddingVertical: 40 }, emptyTitle: { color: "#252821", fontSize: 18, fontWeight: "800" }, emptyBody: { color: "#777970", fontSize: 13, textAlign: "center", marginTop: 8 }, expense: { backgroundColor: "#FFFDF8", borderRadius: 16, padding: 15, marginBottom: 10, borderWidth: 1, borderColor: "#ECE9DF" }, expenseTop: { flexDirection: "row", alignItems: "center" }, icon: { width: 35, height: 35, borderRadius: 10, backgroundColor: "#E8F0E1", alignItems: "center", justifyContent: "center" }, expenseMain: { flex: 1, marginLeft: 10 }, expenseTitle: { color: "#252821", fontWeight: "800", fontSize: 16 }, meta: { color: "#888B81", fontSize: 11, marginTop: 3 }, amount: { color: "#29332A", fontWeight: "800" }, split: { color: "#596156", fontSize: 12, marginTop: 13 }, description: { color: "#777970", fontSize: 12, marginTop: 7 }, history: { backgroundColor: "#EEF4EE", borderRadius: 12, padding: 13, flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }, historyText: { color: "#4A5C4E", flex: 1, fontSize: 12 }, historyAmount: { color: "#28634E", fontWeight: "800" }, backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(28,34,27,.35)" }, sheet: { backgroundColor: "#F7F5EF", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: "92%" }, sheetHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 18 }, sheetTitle: { color: "#252821", fontSize: 24, fontWeight: "800" }, close: { color: "#577050", fontWeight: "700" }, sheetBody: { color: "#64716B", lineHeight: 20, marginBottom: 15 }, personRow: { backgroundColor: "#FFFDF8", borderColor: "#E1E6DE", borderWidth: 1, borderRadius: 13, padding: 14, flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 9 }, personName: { color: "#18251F", fontWeight: "800", fontSize: 15 }, direction: { fontSize: 12, fontWeight: "700", marginTop: 3 }, personRight: { flexDirection: "row", alignItems: "center", gap: 6 }, personAmount: { fontWeight: "900", fontSize: 17 }, red: { color: "#B34B42" }, green: { color: "#28634E" }, secondary: { borderColor: "#B9C8BC", borderWidth: 1, borderRadius: 12, padding: 14, alignItems: "center", marginTop: 11 }, secondaryText: { color: "#28634E", fontWeight: "800" }, backLink: { color: "#28634E", fontWeight: "800", marginBottom: 12 }, owedAmount: { color: "#18251F", fontSize: 19, fontWeight: "900", marginBottom: 9 }, label: { color: "#777970", fontSize: 11, fontWeight: "800", letterSpacing: 1, marginTop: 11, marginBottom: 7 }, input: { backgroundColor: "#FFFDF8", borderColor: "#E1DED3", borderWidth: 1, borderRadius: 11, padding: 12, fontSize: 15, color: "#252821" }, done: { alignSelf: "flex-end", color: "#28634E", fontWeight: "800", fontSize: 12, marginTop: 8 }, info: { color: "#18251F", backgroundColor: "#FFFDF8", borderRadius: 9, padding: 11, marginBottom: 7 }, none: { color: "#64716B", fontStyle: "italic", marginBottom: 8 }, instructions: { color: "#64716B", fontSize: 12, lineHeight: 18, marginTop: 14 }, methods: { flexDirection: "row", gap: 8, marginTop: 12 }, method: { borderColor: "#D8D9CF", borderWidth: 1, borderRadius: 9, paddingHorizontal: 11, paddingVertical: 8 }, methodOn: { backgroundColor: "#DCE8D3", borderColor: "#8FA584" }, methodText: { color: "#35513A", fontWeight: "700", fontSize: 12 }, dateButton: { backgroundColor: "#FFFDF8", borderColor: "#E1DED3", borderWidth: 1, borderRadius: 11, padding: 12, flexDirection: "row", justifyContent: "space-between" }, dateText: { color: "#252821" }, dateIcon: { color: "#28634E" }, paid: { color: "#28634E", fontSize: 12, fontWeight: "800", marginTop: 16 }, people: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, chip: { borderWidth: 1, borderColor: "#D8D9CF", paddingHorizontal: 13, paddingVertical: 9, borderRadius: 9 }, chipOn: { backgroundColor: "#DCE8D3", borderColor: "#8FA584" }, chipText: { color: "#596156", fontWeight: "700", fontSize: 12 }, receiptItem: { backgroundColor: "#FFFFFF", borderColor: "#E1DED3", borderWidth: 1, borderRadius: 11, marginBottom: 9, padding: 10 }, itemName: { color: "#252821", fontWeight: "700", paddingVertical: 5 }, itemAmount: { borderTopColor: "#E1DED3", borderTopWidth: 1, color: "#252821", paddingVertical: 8 }, itemPeople: { gap: 7, paddingTop: 3 }, itemPerson: { borderColor: "#D8D9CF", borderWidth: 1, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 6 }, addItem: { alignSelf: "flex-start", paddingVertical: 9 }, descriptionInput: { minHeight: 65, textAlignVertical: "top" }, save: { backgroundColor: "#263D2C", padding: 15, borderRadius: 12, alignItems: "center", marginTop: 22, marginBottom: 12 }, saveText: { color: "#FFFDF8", fontWeight: "800" }, disabled: { opacity: .55 }, calendarOverlay: { flex: 1, justifyContent: "center", padding: 24, backgroundColor: "rgba(28,34,27,.35)" }, calendar: { backgroundColor: "#FFFDF8", borderRadius: 18, padding: 18 }, calendarHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }, calendarArrow: { color: "#28634E", fontSize: 26, paddingHorizontal: 10 }, calendarMonth: { color: "#18251F", fontWeight: "800" }, calendarGrid: { flexDirection: "row", flexWrap: "wrap" }, calendarDay: { width: "14.2857%", aspectRatio: 1, alignItems: "center", justifyContent: "center" }, calendarDayOn: { backgroundColor: "#28634E", borderRadius: 20 }, calendarDayText: { color: "#18251F", fontWeight: "700" }, calendarDayTextOn: { color: "white" }, cancel: { alignSelf: "flex-end", marginTop: 14, padding: 8 },
 });

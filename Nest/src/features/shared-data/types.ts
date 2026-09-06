@@ -55,6 +55,7 @@ export type ExpensePaymentStatus = "open" | "pending" | "confirmed";
 export type NestExpenseParticipant = {
   userId: string;
   paymentStatus: ExpensePaymentStatus;
+  shareAmount: number;
 };
 
 export type NestExpense = {
@@ -69,4 +70,22 @@ export type NestExpense = {
   createdByUserId: string;
   createdAt: string;
   participants: NestExpenseParticipant[];
+};
+
+export type NestExpenseSettlement = {
+  id: string;
+  payerUserId: string;
+  recipientUserId: string;
+  amount: number;
+  paymentMethod: "venmo" | "zelle" | "other";
+  note: string;
+  createdAt: string;
+};
+
+export type NestPaymentContact = {
+  userId: string;
+  fullName: string;
+  phone: string | null;
+  venmo: string | null;
+  zelle: string | null;
 };
