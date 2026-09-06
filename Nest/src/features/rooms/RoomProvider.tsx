@@ -201,7 +201,14 @@ export function RoomProvider({ children }: PropsWithChildren) {
     const client = getSupabaseClient();
     const { error: leaveError } = await client.rpc("leave_nest");
     if (leaveError) throw toRoomError(leaveError);
-    await refresh();
+
+    // Update local room state before the background refresh so the profile
+    // screen can immediately route the member to Create / Join Nest.
+    setRoom(null);
+    setActiveInvite(null);
+    setNestJoinCode(null);
+    setError(null);
+    void refresh();
   }, [refresh]);
 
   const regenerateInvite = useCallback(async () => {
