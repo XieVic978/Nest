@@ -8,6 +8,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   invite_revoked: "That invitation is no longer active. Ask a Nest admin for a new one.",
   member_is_admin: "Transfer admin access before removing this member.",
   membership_not_found: "This person is no longer a member of the Nest.",
+  nest_membership_required: "You do not currently belong to a Nest.",
   nest_admin_required: "Only a Nest admin can do that.",
   nest_name_required: "Enter a name for your Nest.",
   nest_not_found: "This Nest no longer exists.",
