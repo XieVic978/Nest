@@ -13,6 +13,7 @@ export type NestChore = {
   priority: ChorePriority;
   recurrence: ChoreRecurrence;
   rotationUserIds: string[];
+  displayOnCalendar: boolean;
   createdBy: string;
   completedBy: string | null;
   completedAt: string | null;
