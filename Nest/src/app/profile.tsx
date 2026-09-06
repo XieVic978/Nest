@@ -71,7 +71,7 @@ export default function ProfileScreen() {
 
       <Pressable
         accessibilityRole="button"
-        onPress={() => router.replace(ROOM_HOME)}
+        onPress={() => router.replace(room ? ROOM_HOME : "/create-join")}
         style={styles.backToNest}
       >
         <Text style={styles.buttonText}>Back to Nest</Text>

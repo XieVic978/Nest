@@ -133,6 +133,15 @@ export default function CreateJoinScreen() {
         </View>
       </ScrollView>
 
+      <Pressable
+        accessibilityLabel="Profile"
+        accessibilityRole="button"
+        onPress={() => router.push("/profile")}
+        style={styles.profileButton}
+      >
+        <Text style={styles.profileButtonText}>Profile</Text>
+      </Pressable>
+
       <Modal animationType="fade" onRequestClose={() => setSwitchTarget(null)} transparent visible={switchTarget?.status === "switch_required"}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
@@ -151,6 +160,8 @@ export default function CreateJoinScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F5EF" },
+  profileButton: { position: "absolute", right: 24, top: 54, borderColor: "#28634E", borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "#F7F5EF" },
+  profileButtonText: { color: "#28634E", fontSize: 14, fontWeight: "900" },
   content: { flexGrow: 1, justifyContent: "center", padding: 24, paddingVertical: 64 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 14, padding: 28, backgroundColor: "#F7F5EF" },
   eyebrow: { color: "#8B6F47", fontSize: 12, fontWeight: "900", letterSpacing: 1.8, marginBottom: 10 },
