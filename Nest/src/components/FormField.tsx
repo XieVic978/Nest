@@ -8,6 +8,7 @@ import {
   View,
   type TextInputProps,
 } from "react-native";
+import { nestTheme } from "@/theme/nest";
 
 interface FormFieldProps extends TextInputProps {
   label: string;
@@ -36,27 +37,28 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1f2933",
-    marginBottom: 6,
+    fontSize: 11,
+    fontWeight: "800",
+    color: nestTheme.colors.muted,
+    letterSpacing: 1,
+    marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#d2d6dc",
-    borderRadius: 10,
+    borderColor: nestTheme.colors.border,
+    borderRadius: nestTheme.radius.control,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
-    color: "#1f2933",
-    backgroundColor: "#fff",
+    color: nestTheme.colors.ink,
+    backgroundColor: nestTheme.colors.surface,
   },
   inputError: {
-    borderColor: "#d64545",
+    borderColor: nestTheme.colors.coral,
   },
   error: {
     marginTop: 6,
-    color: "#d64545",
+    color: "#B95048",
     fontSize: 13,
   },
 });

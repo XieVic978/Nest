@@ -84,8 +84,8 @@ export default function SignIn() {
 }
 
 const styles = StyleSheet.create({
-  formError: { color: "#d64545", fontSize: 14, marginBottom: 14 },
+  formError: { color: "#B95048", fontSize: 14, marginBottom: 14 },
   footer: { alignItems: "center", gap: 14, marginTop: 22 },
-  link: { color: "#2f6fed", fontSize: 14, fontWeight: "600" },
-  secondaryLink: { color: "#59636f", fontSize: 14, fontWeight: "600" },
+  link: { color: "#4975A8", fontSize: 14, fontWeight: "800" },
+  secondaryLink: { color: "#6B7785", fontSize: 14, fontWeight: "700" },
 });
