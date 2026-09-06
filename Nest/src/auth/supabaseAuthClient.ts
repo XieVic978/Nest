@@ -187,6 +187,23 @@ export const supabaseAuthClient: AuthClient = {
     return data === true ? { ok: true } : { ok: false, error: "That PIN is not correct." };
   },
 
+  async resetDocumentPin(accountPassword, newPin): Promise<VoidResult> {
+    const client = requireClient();
+    const { data: sessionData } = await client.auth.getSession();
+    const email = sessionData.session?.user.email;
+    if (!email) return { ok: false, error: "You are not signed in." };
+
+    // Supabase keeps password hashes private. Re-authenticating the current
+    // account is the proof required before replacing its separately hashed PIN.
+    const { error: passwordError } = await client.auth.signInWithPassword({
+      email,
+      password: accountPassword,
+    });
+    if (passwordError) return { ok: false, error: "That account password is not correct." };
+
+    return supabaseAuthClient.setDocumentPin(newPin);
+  },
+
   async updateProfile(userId, profile): Promise<AuthResult> {
     const client = requireClient();
     const clean = (value: string | undefined) => {

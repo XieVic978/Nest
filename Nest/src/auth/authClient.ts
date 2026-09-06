@@ -36,6 +36,7 @@ export interface AuthClient {
 
   setDocumentPin(pin: string): Promise<VoidResult>;
   verifyDocumentPin(pin: string): Promise<VoidResult>;
+  resetDocumentPin(accountPassword: string, newPin: string): Promise<VoidResult>;
 
   /** Return the currently authenticated user, or null. */
   getCurrentUser(): Promise<User | null>;

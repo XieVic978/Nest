@@ -35,6 +35,7 @@ interface SessionContextValue {
   updateProfile: (profile: UserProfile) => Promise<AuthResult>;
   setDocumentPin: (pin: string) => Promise<VoidResult>;
   verifyDocumentPin: (pin: string) => Promise<VoidResult>;
+  resetDocumentPin: (accountPassword: string, newPin: string) => Promise<VoidResult>;
 }
 
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
@@ -117,6 +118,11 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
   const setDocumentPin = useCallback((pin: string) => authClient.setDocumentPin(pin), []);
   const verifyDocumentPin = useCallback((pin: string) => authClient.verifyDocumentPin(pin), []);
+  const resetDocumentPin = useCallback(
+    (accountPassword: string, newPin: string) =>
+      authClient.resetDocumentPin(accountPassword, newPin),
+    [],
+  );
 
   const value = useMemo<SessionContextValue>(
     () => ({
@@ -134,6 +140,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       updateProfile,
       setDocumentPin,
       verifyDocumentPin,
+      resetDocumentPin,
     }),
     [
       isLoading,
@@ -149,6 +156,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       updateProfile,
       setDocumentPin,
       verifyDocumentPin,
+      resetDocumentPin,
     ]
   );
 
