@@ -24,8 +24,12 @@ interface SessionContextValue {
   isLoading: boolean;
   user: User | null;
   hasCompletedProfile: boolean;
-  sendMagicLink: (email: string) => Promise<VoidResult>;
-  completeMagicLink: (url: string) => Promise<AuthResult>;
+  signUp: (email: string, password: string) => Promise<VoidResult>;
+  signInWithPassword: (email: string, password: string) => Promise<AuthResult>;
+  verifyEmailCode: (email: string, code: string) => Promise<AuthResult>;
+  resendVerificationCode: (email: string) => Promise<VoidResult>;
+  sendPasswordResetCode: (email: string) => Promise<VoidResult>;
+  resetPasswordWithCode: (email: string, code: string, password: string) => Promise<AuthResult>;
   signInWithGoogle: () => Promise<AuthResult>;
   signOut: () => Promise<void>;
   updateProfile: (profile: UserProfile) => Promise<AuthResult>;
@@ -62,12 +66,26 @@ export function SessionProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
-  const sendMagicLink = useCallback((email: string) => {
-    return authClient.sendMagicLink(email);
+  const signUp = useCallback((email: string, password: string) => {
+    return authClient.signUp(email, password);
   }, []);
 
-  const completeMagicLink = useCallback(async (url: string) => {
-    const result = await authClient.completeMagicLink(url);
+  const signInWithPassword = useCallback(async (email: string, password: string) => {
+    const result = await authClient.signInWithPassword(email, password);
+    if (result.ok) setUser(result.user);
+    return result;
+  }, []);
+
+  const verifyEmailCode = useCallback(async (email: string, code: string) => {
+    const result = await authClient.verifyEmailCode(email, code);
+    if (result.ok) setUser(result.user);
+    return result;
+  }, []);
+
+  const resendVerificationCode = useCallback((email: string) => authClient.resendVerificationCode(email), []);
+  const sendPasswordResetCode = useCallback((email: string) => authClient.sendPasswordResetCode(email), []);
+  const resetPasswordWithCode = useCallback(async (email: string, code: string, password: string) => {
+    const result = await authClient.resetPasswordWithCode(email, code, password);
     if (result.ok) setUser(result.user);
     return result;
   }, []);
@@ -100,8 +118,12 @@ export function SessionProvider({ children }: PropsWithChildren) {
       isLoading,
       user,
       hasCompletedProfile: user?.profile != null,
-      sendMagicLink,
-      completeMagicLink,
+      signUp,
+      signInWithPassword,
+      verifyEmailCode,
+      resendVerificationCode,
+      sendPasswordResetCode,
+      resetPasswordWithCode,
       signInWithGoogle,
       signOut,
       updateProfile,
@@ -109,8 +131,12 @@ export function SessionProvider({ children }: PropsWithChildren) {
     [
       isLoading,
       user,
-      sendMagicLink,
-      completeMagicLink,
+      signUp,
+      signInWithPassword,
+      verifyEmailCode,
+      resendVerificationCode,
+      sendPasswordResetCode,
+      resetPasswordWithCode,
       signInWithGoogle,
       signOut,
       updateProfile,

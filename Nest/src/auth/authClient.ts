@@ -6,26 +6,18 @@
 // `supabaseAuthClient` that implements this interface and export it from
 // ./index.ts; no screen or context code needs to change.
 //
-// Authentication uses a one-time email sign-in link. There are no passwords:
-// the same flow signs in returning users and creates accounts for new emails
-// when the link is opened.
-//
-// Mapping notes for the future Supabase implementation:
-//   sendMagicLink         -> supabase.auth.signInWithOtp({ email, options })
-//   completeMagicLink     -> supabase.auth.setSession({ access_token, refresh_token })
-//   signInWithGoogle      -> supabase.auth.signInWithOAuth({ provider: "google" })
-//   signOut               -> supabase.auth.signOut()
-//   updateProfile         -> upsert into a `profiles` table keyed by user id
-//   getCurrentUser        -> supabase.auth.getSession() + fetch profile row
+// Nest uses email/password accounts. When email confirmation is enabled in
+// Supabase, new accounts are verified by typing the emailed code in the app.
 
 import { AuthResult, User, UserProfile, VoidResult } from "./types";
 
 export interface AuthClient {
-  /** Send a one-time sign-in link to the given email address. */
-  sendMagicLink(email: string): Promise<VoidResult>;
-
-  /** Complete sign-in from the URL that opened the app. */
-  completeMagicLink(url: string): Promise<AuthResult>;
+  signUp(email: string, password: string): Promise<VoidResult>;
+  signInWithPassword(email: string, password: string): Promise<AuthResult>;
+  verifyEmailCode(email: string, code: string): Promise<AuthResult>;
+  resendVerificationCode(email: string): Promise<VoidResult>;
+  sendPasswordResetCode(email: string): Promise<VoidResult>;
+  resetPasswordWithCode(email: string, code: string, password: string): Promise<AuthResult>;
 
   /**
    * Sign in with Google (OAuth). On success, signs in the existing user or

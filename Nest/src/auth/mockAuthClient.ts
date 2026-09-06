@@ -19,6 +19,7 @@ interface MockRecord {
 }
 
 const users = new Map<string, MockRecord>(); // key: normalized email
+const pendingCodes = new Map<string, { code: string; purpose: "signup" | "recovery" }>();
 let currentUserId: string | null = null;
 
 function generateId(): string {
@@ -67,20 +68,53 @@ function signInOrCreate(email: string): MockRecord {
 }
 
 export const mockAuthClient: AuthClient = {
-  async sendMagicLink(email): Promise<VoidResult> {
+  async signUp(email, _password): Promise<VoidResult> {
     const key = normalizeEmail(email);
-    console.log(
-      `[Nest magic link] nest://auth/callback?mock_email=${encodeURIComponent(key)}`
-    );
+    if (users.has(key)) return { ok: false, error: "An account already exists for this email." };
+    pendingCodes.set(key, { code: "123456", purpose: "signup" });
+    console.log(`[Nest verification code for ${key}] 123456`);
     return { ok: true };
   },
 
-  async completeMagicLink(url): Promise<AuthResult> {
-    const match = url.match(/[?&]mock_email=([^&#]+)/);
-    if (!match) {
-      return { ok: false, error: "This mock sign-in link is invalid." };
+  async signInWithPassword(email, _password): Promise<AuthResult> {
+    const record = users.get(normalizeEmail(email));
+    if (!record) return { ok: false, error: "No account was found for that email." };
+    currentUserId = record.id;
+    return { ok: true, user: toUser(record) };
+  },
+
+  async verifyEmailCode(email, code): Promise<AuthResult> {
+    const key = normalizeEmail(email);
+    const pending = pendingCodes.get(key);
+    if (!pending || pending.purpose !== "signup" || pending.code !== code.trim()) {
+      return { ok: false, error: "That verification code isn't valid." };
     }
-    const record = signInOrCreate(decodeURIComponent(match[1]));
+    pendingCodes.delete(key);
+    const record = signInOrCreate(key);
+    return { ok: true, user: toUser(record) };
+  },
+
+  async resendVerificationCode(email): Promise<VoidResult> {
+    pendingCodes.set(normalizeEmail(email), { code: "123456", purpose: "signup" });
+    return { ok: true };
+  },
+
+  async sendPasswordResetCode(email): Promise<VoidResult> {
+    const key = normalizeEmail(email);
+    if (!users.has(key)) return { ok: true };
+    pendingCodes.set(key, { code: "123456", purpose: "recovery" });
+    return { ok: true };
+  },
+
+  async resetPasswordWithCode(email, code, _password): Promise<AuthResult> {
+    const key = normalizeEmail(email);
+    const pending = pendingCodes.get(key);
+    const record = users.get(key);
+    if (!record || !pending || pending.purpose !== "recovery" || pending.code !== code.trim()) {
+      return { ok: false, error: "That reset code isn't valid." };
+    }
+    pendingCodes.delete(key);
+    currentUserId = record.id;
     return { ok: true, user: toUser(record) };
   },
 

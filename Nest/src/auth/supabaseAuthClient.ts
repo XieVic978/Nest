@@ -7,8 +7,6 @@
 // This implements the exact same interface as the mock, so switching backends
 // is a one-line change in ./index.ts.
 
-import * as Linking from "expo-linking";
-
 import { supabase } from "./supabase";
 import { AuthClient } from "./authClient";
 import { AuthResult, User, UserProfile, VoidResult } from "./types";
@@ -65,55 +63,26 @@ async function fetchProfile(userId: string): Promise<ProfileRow | null> {
 }
 
 export const supabaseAuthClient: AuthClient = {
-  async sendMagicLink(email): Promise<VoidResult> {
+  async signUp(email, password): Promise<VoidResult> {
     const client = requireClient();
-    const { error } = await client.auth.signInWithOtp({
+    const { error } = await client.auth.signUp({
       email: normalizeEmail(email),
-      // Allow this call to create the auth user if they don't exist yet, so
-      // the same flow serves both sign-in and sign-up.
-      options: {
-        shouldCreateUser: true,
-        emailRedirectTo: Linking.createURL("auth/callback"),
-      },
+      password,
     });
     if (error) return { ok: false, error: error.message };
     return { ok: true };
   },
 
-  async completeMagicLink(url): Promise<AuthResult> {
+  async signInWithPassword(email, password): Promise<AuthResult> {
     const client = requireClient();
-
-    // Supabase's implicit mobile flow returns session values in the URL hash.
-    // Error details can also arrive in either the query string or hash.
-    const [beforeHash, hash = ""] = url.split("#", 2);
-    const query = beforeHash.includes("?")
-      ? beforeHash.slice(beforeHash.indexOf("?") + 1)
-      : "";
-    const params = new URLSearchParams(
-      [query, hash].filter(Boolean).join("&")
-    );
-    const linkError = params.get("error_description") ?? params.get("error");
-    if (linkError) {
-      return { ok: false, error: linkError.replace(/\+/g, " ") };
-    }
-
-    const accessToken = params.get("access_token");
-    const refreshToken = params.get("refresh_token");
-    if (!accessToken || !refreshToken) {
-      return {
-        ok: false,
-        error: "This sign-in link is invalid or has expired. Request a new link.",
-      };
-    }
-
-    const { data, error } = await client.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
+    const { data, error } = await client.auth.signInWithPassword({
+      email: normalizeEmail(email),
+      password,
     });
     if (error || !data.user) {
       return {
         ok: false,
-        error: error?.message ?? "This sign-in link could not be verified.",
+        error: error?.message ?? "We couldn't sign you in.",
       };
     }
     const row = await fetchProfile(data.user.id);
@@ -121,6 +90,53 @@ export const supabaseAuthClient: AuthClient = {
       ok: true,
       user: toUser(data.user.id, data.user.email ?? "", row),
     };
+  },
+
+  async verifyEmailCode(email, code): Promise<AuthResult> {
+    const client = requireClient();
+    const { data, error } = await client.auth.verifyOtp({
+      email: normalizeEmail(email),
+      token: code.trim(),
+      type: "signup",
+    });
+    if (error || !data.user) {
+      return { ok: false, error: error?.message ?? "That verification code isn't valid." };
+    }
+    const row = await fetchProfile(data.user.id);
+    return { ok: true, user: toUser(data.user.id, data.user.email ?? "", row) };
+  },
+
+  async resendVerificationCode(email): Promise<VoidResult> {
+    const client = requireClient();
+    const { error } = await client.auth.resend({
+      type: "signup",
+      email: normalizeEmail(email),
+    });
+    return error ? { ok: false, error: error.message } : { ok: true };
+  },
+
+  async sendPasswordResetCode(email): Promise<VoidResult> {
+    const client = requireClient();
+    const { error } = await client.auth.resetPasswordForEmail(normalizeEmail(email));
+    return error ? { ok: false, error: error.message } : { ok: true };
+  },
+
+  async resetPasswordWithCode(email, code, password): Promise<AuthResult> {
+    const client = requireClient();
+    const { data, error } = await client.auth.verifyOtp({
+      email: normalizeEmail(email),
+      token: code.trim(),
+      type: "recovery",
+    });
+    if (error || !data.user) {
+      return { ok: false, error: error?.message ?? "That reset code isn't valid." };
+    }
+    const { data: updated, error: updateError } = await client.auth.updateUser({ password });
+    if (updateError || !updated.user) {
+      return { ok: false, error: updateError?.message ?? "We couldn't update your password." };
+    }
+    const row = await fetchProfile(updated.user.id);
+    return { ok: true, user: toUser(updated.user.id, updated.user.email ?? "", row) };
   },
 
   async signInWithGoogle(): Promise<AuthResult> {
