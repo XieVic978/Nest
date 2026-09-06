@@ -16,10 +16,11 @@ interface MockRecord {
   phone: string | null;
   venmo: string | null;
   zelle: string | null;
+  documentsPin: string | null;
 }
 
 const users = new Map<string, MockRecord>(); // key: normalized email
-const pendingOtps = new Map<string, string>(); // key: normalized email
+const pendingCodes = new Map<string, { code: string; purpose: "signup" | "recovery" }>();
 let currentUserId: string | null = null;
 
 function generateId(): string {
@@ -37,7 +38,7 @@ function toUser(record: MockRecord): User {
         ...(record.zelle ? { zelle: record.zelle } : {}),
       }
     : null;
-  return { id: record.id, email: record.email, profile };
+  return { id: record.id, email: record.email, profile, hasDocumentPin: record.documentsPin != null };
 }
 
 function findById(id: string): MockRecord | undefined {
@@ -60,6 +61,7 @@ function signInOrCreate(email: string): MockRecord {
       phone: null,
       venmo: null,
       zelle: null,
+      documentsPin: null,
     };
     users.set(key, record);
   }
@@ -68,30 +70,53 @@ function signInOrCreate(email: string): MockRecord {
 }
 
 export const mockAuthClient: AuthClient = {
-  async sendEmailOtp(email): Promise<VoidResult> {
+  async signUp(email, _password): Promise<VoidResult> {
     const key = normalizeEmail(email);
-    const token = "123456";
-    pendingOtps.set(key, token);
-    console.log(`[Nest email OTP] ${token} for ${key}`);
+    if (users.has(key)) return { ok: false, error: "An account already exists for this email." };
+    pendingCodes.set(key, { code: "12345678", purpose: "signup" });
+    console.log(`[Nest verification code for ${key}] 12345678`);
     return { ok: true };
   },
 
-  async verifyEmailOtp(email, token): Promise<AuthResult> {
+  async signInWithPassword(email, _password): Promise<AuthResult> {
+    const record = users.get(normalizeEmail(email));
+    if (!record) return { ok: false, error: "No account was found for that email." };
+    currentUserId = record.id;
+    return { ok: true, user: toUser(record) };
+  },
+
+  async verifyEmailCode(email, code): Promise<AuthResult> {
     const key = normalizeEmail(email);
-    if (pendingOtps.get(key) !== token.trim()) {
-      return { ok: false, error: "That code is invalid or has expired." };
+    const pending = pendingCodes.get(key);
+    if (!pending || pending.purpose !== "signup" || pending.code !== code.trim()) {
+      return { ok: false, error: "That verification code isn't valid." };
     }
-    pendingOtps.delete(key);
+    pendingCodes.delete(key);
     const record = signInOrCreate(key);
     return { ok: true, user: toUser(record) };
   },
 
-  async completeMagicLink(url): Promise<AuthResult> {
-    const match = url.match(/[?&]mock_email=([^&#]+)/);
-    if (!match) {
-      return { ok: false, error: "This mock sign-in link is invalid." };
+  async resendVerificationCode(email): Promise<VoidResult> {
+    pendingCodes.set(normalizeEmail(email), { code: "12345678", purpose: "signup" });
+    return { ok: true };
+  },
+
+  async sendPasswordResetCode(email): Promise<VoidResult> {
+    const key = normalizeEmail(email);
+    if (!users.has(key)) return { ok: true };
+    pendingCodes.set(key, { code: "12345678", purpose: "recovery" });
+    return { ok: true };
+  },
+
+  async resetPasswordWithCode(email, code, _password): Promise<AuthResult> {
+    const key = normalizeEmail(email);
+    const pending = pendingCodes.get(key);
+    const record = users.get(key);
+    if (!record || !pending || pending.purpose !== "recovery" || pending.code !== code.trim()) {
+      return { ok: false, error: "That reset code isn't valid." };
     }
-    const record = signInOrCreate(decodeURIComponent(match[1]));
+    pendingCodes.delete(key);
+    currentUserId = record.id;
     return { ok: true, user: toUser(record) };
   },
 
@@ -122,6 +147,19 @@ export const mockAuthClient: AuthClient = {
     record.venmo = clean(profile.venmo);
     record.zelle = clean(profile.zelle);
     return { ok: true, user: toUser(record) };
+  },
+
+  async setDocumentPin(pin): Promise<VoidResult> {
+    const record = currentUserId ? findById(currentUserId) : undefined;
+    if (!record) return { ok: false, error: "You are not signed in." };
+    record.documentsPin = pin;
+    return { ok: true };
+  },
+
+  async verifyDocumentPin(pin): Promise<VoidResult> {
+    const record = currentUserId ? findById(currentUserId) : undefined;
+    if (!record || record.documentsPin !== pin) return { ok: false, error: "That PIN is not correct." };
+    return { ok: true };
   },
 
   async getCurrentUser() {

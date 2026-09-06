@@ -1,9 +1,7 @@
 // Supabase-backed implementation of AuthClient.
 //
-// Auth supports email OTP (a code emailed to the user) and Google OAuth. Profile
-// data lives in a `profiles` table keyed by the auth user id. See the setup
-// checklist for the SQL that creates that table and its row-level-security
-// policies, and for the Google provider configuration.
+// Auth supports email/password verification flows and Google OAuth. Profile
+// data lives in a `profiles` table keyed by the auth user id.
 //
 // This implements the exact same interface as the mock, so switching backends
 // is a one-line change in ./index.ts.
@@ -17,23 +15,17 @@ import { AuthClient } from "./authClient";
 import { AuthResult, User, UserProfile, VoidResult } from "./types";
 import { normalizeEmail } from "./validation";
 
-// Finishes any pending web auth session (no-op on native, required for web).
 WebBrowser.maybeCompleteAuthSession();
 
-// The URL Google/Supabase redirect back to after OAuth. On native this becomes
-// the app's custom scheme (e.g. nest://). Must be added to Supabase's
-// "Additional Redirect URLs" allow-list.
 const oauthRedirectTo = makeRedirectUri();
 
-// Given the redirect URL returned from the OAuth browser session, extract the
-// tokens and establish the Supabase session.
 async function createSessionFromUrl(url: string) {
   const client = requireClient();
   const { params, errorCode } = QueryParams.getQueryParams(url);
   if (errorCode) throw new Error(errorCode);
 
   const { access_token, refresh_token } = params;
-  if (!access_token) return null;
+  if (!access_token || !refresh_token) return null;
 
   const { data, error } = await client.auth.setSession({
     access_token,
@@ -63,7 +55,7 @@ function requireClient() {
 
 // Build the app's User from an auth id/email + a (possibly missing) profile row.
 // A profile is considered complete once the full name is set.
-function toUser(id: string, email: string, row: ProfileRow | null): User {
+function toUser(id: string, email: string, row: ProfileRow | null, hasDocumentPin = false): User {
   const profile: UserProfile | null = row?.full_name
     ? {
         fullName: row.full_name,
@@ -72,7 +64,7 @@ function toUser(id: string, email: string, row: ProfileRow | null): User {
         ...(row.zelle ? { zelle: row.zelle } : {}),
       }
     : null;
-  return { id, email, profile };
+  return { id, email, profile, hasDocumentPin };
 }
 
 // Fetch the profile row for a user id, or null if none exists yet.
@@ -93,90 +85,108 @@ async function fetchProfile(userId: string): Promise<ProfileRow | null> {
   return (data as ProfileRow) ?? null;
 }
 
+async function fetchDocumentPinState(): Promise<boolean> {
+  const { data, error } = await requireClient().rpc("has_document_pin");
+  if (error) {
+    console.warn("[Nest] Could not read Documents PIN state:", error.message);
+    return false;
+  }
+  return data === true;
+}
+
 export const supabaseAuthClient: AuthClient = {
-  async sendEmailOtp(email): Promise<VoidResult> {
+  async signUp(email, password): Promise<VoidResult> {
     const client = requireClient();
-    const { error } = await client.auth.signInWithOtp({
-      email: normalizeEmail(email),
-      // Allow this call to create the auth user if they don't exist yet, so
-      // the same flow serves both sign-in and sign-up.
-      options: {
-        shouldCreateUser: true,
-      },
+    const normalizedEmail = normalizeEmail(email);
+    const { data, error } = await client.auth.signUp({
+      email: normalizedEmail,
+      password,
     });
     if (error) return { ok: false, error: error.message };
+
+    // With email confirmation enabled, Supabase returns a generic successful
+    // response for an existing account but leaves `identities` empty. Treat
+    // that response as an existing account rather than taking the person to
+    // a verification screen that cannot send another signup code.
+    if (!data.user?.identities?.length) {
+      return {
+        ok: false,
+        error: "An account already exists with this email. Log in or reset your password instead.",
+      };
+    }
+
     return { ok: true };
   },
 
-  async verifyEmailOtp(email, token): Promise<AuthResult> {
+  async signInWithPassword(email, password): Promise<AuthResult> {
     const client = requireClient();
-    const { data, error } = await client.auth.verifyOtp({
+    const { data, error } = await client.auth.signInWithPassword({
       email: normalizeEmail(email),
-      token: token.trim(),
-      type: "email",
+      password,
     });
     if (error || !data.user) {
       return {
         ok: false,
-        error: error?.message ?? "This code could not be verified.",
+        error: error?.message ?? "We couldn't sign you in.",
       };
     }
-
     const row = await fetchProfile(data.user.id);
     return {
       ok: true,
-      user: toUser(data.user.id, data.user.email ?? "", row),
+      user: toUser(data.user.id, data.user.email ?? "", row, await fetchDocumentPinState()),
     };
   },
 
-  async completeMagicLink(url): Promise<AuthResult> {
+  async verifyEmailCode(email, code): Promise<AuthResult> {
     const client = requireClient();
-
-    // Supabase's implicit mobile flow returns session values in the URL hash.
-    // Error details can also arrive in either the query string or hash.
-    const [beforeHash, hash = ""] = url.split("#", 2);
-    const query = beforeHash.includes("?")
-      ? beforeHash.slice(beforeHash.indexOf("?") + 1)
-      : "";
-    const params = new URLSearchParams(
-      [query, hash].filter(Boolean).join("&")
-    );
-    const linkError = params.get("error_description") ?? params.get("error");
-    if (linkError) {
-      return { ok: false, error: linkError.replace(/\+/g, " ") };
-    }
-
-    const accessToken = params.get("access_token");
-    const refreshToken = params.get("refresh_token");
-    if (!accessToken || !refreshToken) {
-      return {
-        ok: false,
-        error: "This sign-in link is invalid or has expired. Request a new link.",
-      };
-    }
-
-    const { data, error } = await client.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
+    const { data, error } = await client.auth.verifyOtp({
+      email: normalizeEmail(email),
+      token: code.trim(),
+      type: "signup",
     });
     if (error || !data.user) {
-      return {
-        ok: false,
-        error: error?.message ?? "This sign-in link could not be verified.",
-      };
+      return { ok: false, error: error?.message ?? "That verification code isn't valid." };
     }
     const row = await fetchProfile(data.user.id);
-    return {
-      ok: true,
-      user: toUser(data.user.id, data.user.email ?? "", row),
-    };
+    return { ok: true, user: toUser(data.user.id, data.user.email ?? "", row, await fetchDocumentPinState()) };
+  },
+
+  async resendVerificationCode(email): Promise<VoidResult> {
+    const client = requireClient();
+    const { error } = await client.auth.resend({
+      type: "signup",
+      email: normalizeEmail(email),
+    });
+    return error ? { ok: false, error: error.message } : { ok: true };
+  },
+
+  async sendPasswordResetCode(email): Promise<VoidResult> {
+    const client = requireClient();
+    const { error } = await client.auth.resetPasswordForEmail(normalizeEmail(email));
+    return error ? { ok: false, error: error.message } : { ok: true };
+  },
+
+  async resetPasswordWithCode(email, code, password): Promise<AuthResult> {
+    const client = requireClient();
+    const { data, error } = await client.auth.verifyOtp({
+      email: normalizeEmail(email),
+      token: code.trim(),
+      type: "recovery",
+    });
+    if (error || !data.user) {
+      return { ok: false, error: error?.message ?? "That reset code isn't valid." };
+    }
+    const { data: updated, error: updateError } = await client.auth.updateUser({ password });
+    if (updateError || !updated.user) {
+      return { ok: false, error: updateError?.message ?? "We couldn't update your password." };
+    }
+    const row = await fetchProfile(updated.user.id);
+    return { ok: true, user: toUser(updated.user.id, updated.user.email ?? "", row, await fetchDocumentPinState()) };
   },
 
   async signInWithGoogle(): Promise<AuthResult> {
     const client = requireClient();
     try {
-      // 1. Ask Supabase for the Google OAuth URL (but don't auto-redirect;
-      //    we open it ourselves in an in-app browser).
       const { data, error } = await client.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -189,17 +199,11 @@ export const supabaseAuthClient: AuthClient = {
         return { ok: false, error: "Could not start Google sign-in." };
       }
 
-      // 2. Open the OAuth flow and wait for the redirect back to the app.
-      const result = await WebBrowser.openAuthSessionAsync(
-        data.url,
-        oauthRedirectTo
-      );
+      const result = await WebBrowser.openAuthSessionAsync(data.url, oauthRedirectTo);
       if (result.type !== "success") {
-        // User dismissed/cancelled the browser.
         return { ok: false, error: "Google sign-in was cancelled." };
       }
 
-      // 3. Turn the returned URL's tokens into a Supabase session.
       const session = await createSessionFromUrl(result.url);
       if (!session?.user) {
         return { ok: false, error: "Google sign-in did not complete." };
@@ -208,11 +212,15 @@ export const supabaseAuthClient: AuthClient = {
       const row = await fetchProfile(session.user.id);
       return {
         ok: true,
-        user: toUser(session.user.id, session.user.email ?? "", row),
+        user: toUser(
+          session.user.id,
+          session.user.email ?? "",
+          row,
+          await fetchDocumentPinState(),
+        ),
       };
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Google sign-in failed.";
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Google sign-in failed.";
       console.warn("[Nest] Google sign-in error:", message);
       return { ok: false, error: message };
     }
@@ -221,6 +229,17 @@ export const supabaseAuthClient: AuthClient = {
   async signOut(): Promise<void> {
     const client = requireClient();
     await client.auth.signOut();
+  },
+
+  async setDocumentPin(pin): Promise<VoidResult> {
+    const { error } = await requireClient().rpc("set_document_pin", { p_pin: pin });
+    return error ? { ok: false, error: error.message } : { ok: true };
+  },
+
+  async verifyDocumentPin(pin): Promise<VoidResult> {
+    const { data, error } = await requireClient().rpc("verify_document_pin", { p_pin: pin });
+    if (error) return { ok: false, error: error.message };
+    return data === true ? { ok: true } : { ok: false, error: "That PIN is not correct." };
   },
 
   async updateProfile(userId, profile): Promise<AuthResult> {
@@ -245,7 +264,7 @@ export const supabaseAuthClient: AuthClient = {
     const row = await fetchProfile(userId);
     return {
       ok: true,
-      user: toUser(userId, userData.user?.email ?? "", row),
+      user: toUser(userId, userData.user?.email ?? "", row, await fetchDocumentPinState()),
     };
   },
 
@@ -255,6 +274,6 @@ export const supabaseAuthClient: AuthClient = {
     const sessionUser = data.session?.user;
     if (!sessionUser) return null;
     const row = await fetchProfile(sessionUser.id);
-    return toUser(sessionUser.id, sessionUser.email ?? "", row);
+    return toUser(sessionUser.id, sessionUser.email ?? "", row, await fetchDocumentPinState());
   },
 };

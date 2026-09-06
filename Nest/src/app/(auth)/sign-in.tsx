@@ -1,208 +1,91 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { router } from "expo-router";
 
 import { useSession } from "@/auth/ctx";
-import { validateEmail } from "@/auth/validation";
+import { validateEmail, validatePassword } from "@/auth/validation";
 import { FormField } from "@/components/FormField";
 import { FormScreen } from "@/components/FormScreen";
 import { PrimaryButton } from "@/components/PrimaryButton";
 
-// Passwordless sign-in via a six-digit email code. Verifying the code creates
-// the Supabase session and sends first-time users to profile setup.
-type Step = "email" | "code";
+type Mode = "login" | "signup" | "reset";
 
 export default function SignIn() {
-  const { sendEmailOtp, verifyEmailOtp, signInWithGoogle } = useSession();
-
-  const [step, setStep] = useState<Step>("email");
+  const { signInWithPassword, signUp, sendPasswordResetCode } = useSession();
+  const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
-  const [errors, setErrors] = useState<{ email?: string; code?: string }>({});
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
-  const [formMessage, setFormMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
 
-  async function handleSendCode() {
+  const isReset = mode === "reset";
+  const isSignUp = mode === "signup";
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    setFormError(null);
+    setPassword("");
+    setConfirmPassword("");
+  }
+
+  async function handleSubmit() {
     const emailError = validateEmail(email);
-    setErrors({ email: emailError ?? undefined });
-    setFormError(null);
-    setFormMessage(null);
-    if (emailError) return;
-
-    setSubmitting(true);
-    const result = await sendEmailOtp(email);
-    setSubmitting(false);
-    if (result.ok) {
-      setStep("code");
-    } else {
-      setFormError(result.error);
+    const passwordError = isReset ? null : validatePassword(password);
+    if (emailError || passwordError) {
+      setFormError(emailError ?? passwordError);
+      return;
     }
-  }
-
-  async function handleVerifyCode() {
-    if (!/^\d{6}$/.test(code)) {
-      setErrors({ code: "Enter the six-digit code from your email." });
+    if (isSignUp && password !== confirmPassword) {
+      setFormError("Passwords do not match.");
       return;
     }
 
-    setErrors({});
     setFormError(null);
-    setFormMessage(null);
     setSubmitting(true);
-    const result = await verifyEmailOtp(email, code);
-    setSubmitting(false);
-    if (!result.ok) {
-      setFormError(result.error);
-    }
-    // On success, the root navigator redirects to profile setup or the Nest.
-  }
-
-  async function handleResend() {
-    setFormError(null);
-    setFormMessage(null);
-    setErrors({});
-    setSubmitting(true);
-    const result = await sendEmailOtp(email);
-    setSubmitting(false);
-    if (!result.ok) {
-      setFormError(result.error);
+    if (isReset) {
+      const result = await sendPasswordResetCode(email);
+      setSubmitting(false);
+      if (!result.ok) return setFormError(result.error);
+      router.push({ pathname: "/(auth)/verify-email", params: { email, purpose: "recovery" } });
       return;
     }
-    setCode("");
-    setFormMessage("A new code was sent.");
-  }
-
-  async function handleGoogle() {
-    setFormError(null);
-    setFormMessage(null);
-    setGoogleLoading(true);
-    const result = await signInWithGoogle();
-    setGoogleLoading(false);
-    if (!result.ok) {
-      setFormError(result.error);
+    if (isSignUp) {
+      const result = await signUp(email, password);
+      setSubmitting(false);
+      if (!result.ok) return setFormError(result.error);
+      router.push({ pathname: "/(auth)/verify-email", params: { email, purpose: "signup" } });
+      return;
     }
-    // On success, the root navigator redirects automatically.
+    const result = await signInWithPassword(email, password);
+    setSubmitting(false);
+    if (!result.ok) setFormError(result.error);
   }
 
   return (
     <FormScreen
-      title="Sign in to Nest"
-      subtitle={
-        step === "email"
-          ? "Enter your email and we'll send you a secure six-digit code."
-          : `Enter the six-digit code we sent to ${email}.`
-      }
+      title={isSignUp ? "Create your Nest account" : isReset ? "Reset your password" : "Welcome back to Nest"}
+      subtitle={isSignUp ? "Use an email and password. We’ll email a code for you to enter here." : isReset ? "We’ll email a code so you can securely choose a new password." : "Log in to get back to your Nest."}
     >
-      {step === "email" ? (
+      <FormField label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" textContentType="emailAddress" placeholder="you@example.com" />
+      {!isReset ? (
         <>
-          <FormField
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            error={errors.email}
-            autoCapitalize="none"
-            autoComplete="email"
-            keyboardType="email-address"
-            textContentType="emailAddress"
-            placeholder="you@example.com"
-          />
-
-          {formError ? <Text style={styles.formError}>{formError}</Text> : null}
-
-          <PrimaryButton
-            title="Send sign-in code"
-            onPress={handleSendCode}
-            loading={submitting}
-            disabled={googleLoading}
-          />
-
-          <View style={styles.divider}>
-            <View style={styles.line} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.line} />
-          </View>
-
-          <PrimaryButton
-            title="Sign in with Google"
-            onPress={handleGoogle}
-            loading={googleLoading}
-            disabled={submitting}
-            style={styles.googleButton}
-          />
+          <FormField label="Password" value={password} onChangeText={setPassword} secureTextEntry autoComplete={isSignUp ? "new-password" : "current-password"} textContentType={isSignUp ? "newPassword" : "password"} placeholder="At least 8 characters" />
+          {isSignUp ? <FormField label="Confirm password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry autoComplete="new-password" textContentType="newPassword" placeholder="Enter it again" /> : null}
         </>
-      ) : (
-        <>
-          <FormField
-            label="6-digit code"
-            value={code}
-            onChangeText={(value) => {
-              setCode(value.replace(/\D/g, "").slice(0, 6));
-              if (errors.code) setErrors({});
-            }}
-            error={errors.code}
-            autoComplete="one-time-code"
-            keyboardType="number-pad"
-            textContentType="oneTimeCode"
-            maxLength={6}
-            placeholder="123456"
-            returnKeyType="done"
-            onSubmitEditing={handleVerifyCode}
-          />
-
-          {formError ? <Text style={styles.formError}>{formError}</Text> : null}
-          {formMessage ? <Text style={styles.formMessage}>{formMessage}</Text> : null}
-
-          <PrimaryButton
-            title="Verify code"
-            onPress={handleVerifyCode}
-            loading={submitting}
-          />
-
-          <Pressable
-            accessibilityRole="button"
-            disabled={submitting}
-            onPress={handleResend}
-            style={styles.resend}
-          >
-            <Text style={styles.link}>Send a new code</Text>
-          </Pressable>
-
-          <View style={styles.footer}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => {
-                setStep("email");
-                setCode("");
-                setErrors({});
-                setFormError(null);
-                setFormMessage(null);
-              }}
-            >
-              <Text style={styles.link}>Use a different email</Text>
-            </Pressable>
-          </View>
-        </>
-      )}
+      ) : null}
+      {formError ? <Text style={styles.formError}>{formError}</Text> : null}
+      <PrimaryButton title={isSignUp ? "Create account" : isReset ? "Email reset code" : "Log in"} onPress={handleSubmit} loading={submitting} />
+      <View style={styles.footer}>
+        {mode === "login" ? <><Pressable onPress={() => switchMode("signup")}><Text style={styles.link}>Create an account</Text></Pressable><Pressable onPress={() => switchMode("reset")}><Text style={styles.secondaryLink}>Forgot password?</Text></Pressable></> : <Pressable onPress={() => switchMode("login")}><Text style={styles.link}>Back to log in</Text></Pressable>}
+      </View>
     </FormScreen>
   );
 }
 
 const styles = StyleSheet.create({
   formError: { color: "#d64545", fontSize: 14, marginBottom: 14 },
-  formMessage: { color: "#28634E", fontSize: 14, marginBottom: 14 },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 20,
-  },
-  line: { flex: 1, height: 1, backgroundColor: "#d2d6dc" },
-  dividerText: { marginHorizontal: 12, color: "#6b7280", fontSize: 13 },
-  googleButton: { backgroundColor: "#4b5563" },
-  resend: { alignItems: "center", marginTop: 18 },
-  footer: {
-    alignItems: "center",
-    marginTop: 20,
-  },
+  footer: { alignItems: "center", gap: 14, marginTop: 22 },
   link: { color: "#2f6fed", fontSize: 14, fontWeight: "600" },
+  secondaryLink: { color: "#59636f", fontSize: 14, fontWeight: "600" },
 });
