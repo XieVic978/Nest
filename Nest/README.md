@@ -6,7 +6,8 @@ Each screen is intentionally bare so one teammate can build it without touching 
 
 | Page | File |
 | --- | --- |
-| Login | `src/app/login.tsx` |
+| Login | `src/app/(auth)/sign-in.tsx` |
+| Profile setup | `src/app/profile-setup.tsx` |
 | Create / join a home | `src/app/create-join.tsx` |
 | Nest — center tab / announcements home | `src/app/(room)/index.tsx` |
 | Payments / what is owed | `src/app/(room)/payments.tsx` |
@@ -17,31 +18,28 @@ Each screen is intentionally bare so one teammate can build it without touching 
 | Authenticated bottom-tab navigation | `src/app/(room)/_layout.tsx` |
 | App-level navigation | `src/app/_layout.tsx` |
 
-The app starts at `src/app/index.tsx`, which sends signed-out users to Login,
-signed-in users without a room to Create / Join, and room members into the
-authenticated tab area. The tab order is Chores, Payments, Nest, Groceries,
-Documents. The top-right Profile button on Nest opens the standalone Profile
-page.
+Protected routes send signed-out users to Login and new users to Profile Setup.
+After completing their profile, users without a room see Create / Join, while
+room members enter the authenticated tab area. The tab order is Chores,
+Payments, Nest, Groceries, Documents.
 
 ## Nest room setup
 
 The room flow uses the authenticated Supabase session. Add these values to a
-local `.env` file (see `.env.example`):
+local `.env.local` file (see `.env.example`):
 
 ```bash
 EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ```
 
-Apply `supabase/migrations/20260905000000_create_nests.sql` to the same Supabase
-project used by authentication. The migration creates rooms, memberships,
-10-minute invitations, transactional RPCs, and Row Level Security policies.
+Apply the migrations in `supabase/migrations` to the same Supabase project used
+by authentication. They create profiles, rooms, memberships, 10-minute
+invitations, transactional RPCs, and Row Level Security policies.
 
-The authentication/display-name flow should save the finished display name in
-Supabase Auth user metadata under `display_name`, or in `profiles.display_name`
-with the authenticated user ID as `profiles.id`. It should also honor the
-optional `returnTo` query parameter on `/login`; this lets a user sign in and
-return to an invitation opened through `nest://join/<token>`.
+The authentication flow stores the display name in `profiles.full_name`, with
+the authenticated user ID as `profiles.id`. A pending `nest://join/<token>`
+invitation is kept through sign-in and profile setup.
 
 All future shared-data tables must have a non-null `room_id`. Their Row Level
 Security policies should authorize access with

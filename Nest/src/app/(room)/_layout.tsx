@@ -11,7 +11,7 @@ export default function RoomLayout() {
     return <View style={styles.center}><ActivityIndicator color="#28634E" size="large" /><Text style={styles.status}>Opening your Nest…</Text></View>;
   }
 
-  if (!user) return <Redirect href="/login" />;
+  if (!user) return <Redirect href="/(auth)/sign-in" />;
   if (!room) {
     if (error) return <View style={styles.center}><Text style={styles.error}>{error}</Text></View>;
     return <Redirect href="/create-join" />;

@@ -1,4 +1,3 @@
-import type { User } from "@supabase/supabase-js";
 import {
   createContext,
   type PropsWithChildren,
@@ -9,6 +8,8 @@ import {
   useState,
 } from "react";
 
+import { useSession } from "@/auth/ctx";
+import type { User } from "@/auth/types";
 import {
   getSupabaseClient,
   isSupabaseConfigured,
@@ -25,35 +26,21 @@ type RoomContextValue = {
   error: string | null;
   joinRoom: (invite: string, confirmLeave?: boolean) => Promise<JoinResult>;
   loading: boolean;
+  pendingInvite: string | null;
+  clearPendingInvite: () => void;
   refresh: () => Promise<void>;
   regenerateInvite: () => Promise<RoomInvite>;
   removeMember: (userId: string) => Promise<void>;
   room: RoomSnapshot | null;
+  rememberInvite: (invite: string) => void;
   transferAdmin: (userId: string) => Promise<void>;
   user: User | null;
 };
 
 const RoomContext = createContext<RoomContextValue | null>(null);
 
-async function getDisplayName(user: User): Promise<string> {
-  const metadata = user.user_metadata as Record<string, unknown>;
-  const candidate =
-    metadata.display_name ?? metadata.full_name ?? metadata.name;
-
-  if (typeof candidate === "string" && candidate.trim()) {
-    return candidate.trim();
-  }
-
-  const client = getSupabaseClient();
-  const { data } = await client
-    .from("profiles")
-    .select("display_name")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (typeof data?.display_name === "string" && data.display_name.trim()) {
-    return data.display_name.trim();
-  }
+function getDisplayName(user: User): string {
+  if (user.profile?.fullName.trim()) return user.profile.fullName.trim();
 
   throw new RoomError(
     "Finish setting your display name before continuing.",
@@ -72,15 +59,15 @@ function normalizeInvite(value: unknown): RoomInvite | null {
 }
 
 export function RoomProvider({ children }: PropsWithChildren) {
-  const [user, setUser] = useState<User | null>(null);
+  const { user } = useSession();
   const [room, setRoom] = useState<RoomSnapshot | null>(null);
   const [activeInvite, setActiveInvite] = useState<RoomInvite | null>(null);
+  const [pendingInvite, setPendingInvite] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!isSupabaseConfigured) {
-      setUser(null);
       setRoom(null);
       setActiveInvite(null);
       setError(
@@ -90,12 +77,7 @@ export function RoomProvider({ children }: PropsWithChildren) {
       return;
     }
 
-    const client = getSupabaseClient();
-    const { data: sessionData } = await client.auth.getSession();
-    const sessionUser = sessionData.session?.user ?? null;
-    setUser(sessionUser);
-
-    if (!sessionUser) {
+    if (!user) {
       setRoom(null);
       setActiveInvite(null);
       setError(null);
@@ -104,6 +86,7 @@ export function RoomProvider({ children }: PropsWithChildren) {
     }
 
     try {
+      const client = getSupabaseClient();
       const { data, error: roomError } = await client.rpc("get_my_nest");
       if (roomError) throw roomError;
 
@@ -129,18 +112,10 @@ export function RoomProvider({ children }: PropsWithChildren) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     void refresh();
-    if (!isSupabaseConfigured) return;
-
-    const client = getSupabaseClient();
-    const { data } = client.auth.onAuthStateChange(() => {
-      void refresh();
-    });
-
-    return () => data.subscription.unsubscribe();
   }, [refresh]);
 
   useEffect(() => {
@@ -181,7 +156,7 @@ export function RoomProvider({ children }: PropsWithChildren) {
       const currentUser = requireUser();
       const client = getSupabaseClient();
       const { data, error: createError } = await client.rpc("create_nest", {
-        p_display_name: await getDisplayName(currentUser),
+        p_display_name: getDisplayName(currentUser),
         p_name: name.trim(),
       });
       if (createError) throw toRoomError(createError);
@@ -208,13 +183,14 @@ export function RoomProvider({ children }: PropsWithChildren) {
 
       const { data, error: joinError } = await client.rpc("join_nest", {
         p_confirm_leave: confirmLeave,
-        p_display_name: await getDisplayName(currentUser),
+        p_display_name: getDisplayName(currentUser),
         p_invite: normalizedInvite,
       });
       if (joinError) throw toRoomError(joinError);
 
       const result = data as JoinResult;
       if (result.status === "joined" || result.status === "already_member") {
+        setPendingInvite(null);
         await refresh();
       }
       return result;
@@ -267,15 +243,18 @@ export function RoomProvider({ children }: PropsWithChildren) {
   const value = useMemo<RoomContextValue>(
     () => ({
       activeInvite,
+      clearPendingInvite: () => setPendingInvite(null),
       configurationReady: isSupabaseConfigured,
       createRoom,
       error,
       joinRoom,
       loading,
+      pendingInvite,
       refresh,
       regenerateInvite,
       removeMember,
       room,
+      rememberInvite: setPendingInvite,
       transferAdmin,
       user,
     }),
@@ -285,6 +264,7 @@ export function RoomProvider({ children }: PropsWithChildren) {
       error,
       joinRoom,
       loading,
+      pendingInvite,
       refresh,
       regenerateInvite,
       removeMember,

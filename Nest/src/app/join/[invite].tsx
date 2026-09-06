@@ -2,13 +2,22 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { useSession } from "@/auth/ctx";
 import { toRoomError } from "@/features/rooms/errors";
 import { useRoom } from "@/features/rooms/RoomProvider";
 import type { JoinResult } from "@/features/rooms/types";
 
 export default function JoinInviteScreen() {
   const { invite } = useLocalSearchParams<{ invite: string }>();
-  const { configurationReady, joinRoom, loading, user } = useRoom();
+  const { hasCompletedProfile, user: sessionUser } = useSession();
+  const {
+    clearPendingInvite,
+    configurationReady,
+    joinRoom,
+    loading,
+    rememberInvite,
+    user,
+  } = useRoom();
   const [error, setError] = useState<string | null>(null);
   const [switchTarget, setSwitchTarget] = useState<JoinResult | null>(null);
   const [joining, setJoining] = useState(false);
@@ -26,11 +35,14 @@ export default function JoinInviteScreen() {
       if (result.status === "switch_required") {
         setSwitchTarget(result);
       } else if (result.status === "admin_transfer_required") {
+        clearPendingInvite();
         setError("You are the only admin of your current Nest. Transfer admin access before leaving.");
       } else {
+        clearPendingInvite();
         router.replace("/(room)");
       }
     } catch (caught) {
+      clearPendingInvite();
       setError(toRoomError(caught).message);
     } finally {
       setJoining(false);
@@ -38,18 +50,25 @@ export default function JoinInviteScreen() {
   }
 
   useEffect(() => {
-    if (loading || !user || attempted.current) return;
+    if (invite) rememberInvite(invite);
+  }, [invite, rememberInvite]);
+
+  useEffect(() => {
+    if (loading || !user || !hasCompletedProfile || attempted.current) return;
     attempted.current = true;
     void accept(false);
-  }, [loading, user]);
+  }, [hasCompletedProfile, loading, user]);
 
   if (loading) return <View style={styles.center}><ActivityIndicator color="#28634E" size="large" /><Text style={styles.body}>Checking your invitation…</Text></View>;
 
   if (!configurationReady) return <View style={styles.center}><Text style={styles.title}>Nest isn’t connected yet</Text><Text style={styles.body}>Supabase environment values are required before this invitation can be opened.</Text></View>;
 
-  if (!user) {
-    const returnTo = `/join/${encodeURIComponent(invite ?? "")}`;
-    return <View style={styles.center}><Text style={styles.title}>You’ve been invited</Text><Text style={styles.body}>Sign in and finish your display name to join this Nest.</Text><Pressable onPress={() => router.replace({ pathname: "/login", params: { returnTo } })} style={styles.primary}><Text style={styles.primaryText}>Continue to login</Text></Pressable></View>;
+  if (!sessionUser) {
+    return <View style={styles.center}><Text style={styles.title}>You’ve been invited</Text><Text style={styles.body}>Sign in and finish your display name to join this Nest.</Text><Pressable onPress={() => router.push("/(auth)/sign-in")} style={styles.primary}><Text style={styles.primaryText}>Continue to login</Text></Pressable></View>;
+  }
+
+  if (!hasCompletedProfile) {
+    return <View style={styles.center}><Text style={styles.title}>Finish your profile</Text><Text style={styles.body}>Add your display name before joining this Nest.</Text><Pressable onPress={() => router.push("/profile-setup")} style={styles.primary}><Text style={styles.primaryText}>Add display name</Text></Pressable></View>;
   }
 
   return (
@@ -57,10 +76,10 @@ export default function JoinInviteScreen() {
       {joining ? <ActivityIndicator color="#28634E" size="large" /> : null}
       <Text style={styles.title}>{error ? "Couldn’t join this Nest" : "Joining your Nest…"}</Text>
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : <Text style={styles.body}>We’re validating the invitation and your membership.</Text>}
-      {error ? <Pressable onPress={() => router.replace("/create-join")} style={styles.secondary}><Text style={styles.secondaryText}>Enter a different code</Text></Pressable> : null}
+      {error ? <Pressable onPress={() => { clearPendingInvite(); router.replace("/create-join"); }} style={styles.secondary}><Text style={styles.secondaryText}>Enter a different code</Text></Pressable> : null}
 
       <Modal animationType="fade" onRequestClose={() => setSwitchTarget(null)} transparent visible={switchTarget?.status === "switch_required"}>
-        <View style={styles.backdrop}><View style={styles.modal}><Text style={styles.modalTitle}>Leave your current Nest?</Text><Text style={styles.body}>Joining {switchTarget?.roomName ?? "this Nest"} will remove you from your current Nest. Are you sure you want to leave?</Text><View style={styles.actions}><Pressable onPress={() => { setSwitchTarget(null); router.replace("/(room)"); }} style={styles.cancel}><Text style={styles.cancelText}>Cancel</Text></Pressable><Pressable onPress={() => { setSwitchTarget(null); void accept(true); }} style={styles.danger}><Text style={styles.primaryText}>Leave and join</Text></Pressable></View></View></View>
+        <View style={styles.backdrop}><View style={styles.modal}><Text style={styles.modalTitle}>Leave your current Nest?</Text><Text style={styles.body}>Joining {switchTarget?.roomName ?? "this Nest"} will remove you from your current Nest. Are you sure you want to leave?</Text><View style={styles.actions}><Pressable onPress={() => { clearPendingInvite(); setSwitchTarget(null); router.replace("/(room)"); }} style={styles.cancel}><Text style={styles.cancelText}>Cancel</Text></Pressable><Pressable onPress={() => { setSwitchTarget(null); void accept(true); }} style={styles.danger}><Text style={styles.primaryText}>Leave and join</Text></Pressable></View></View></View>
       </Modal>
     </View>
   );
