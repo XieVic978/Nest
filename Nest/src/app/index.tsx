@@ -4,7 +4,7 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useSession } from "@/auth/ctx";
 import { useRoom } from "@/features/rooms/RoomProvider";
 
-const ROOM_HOME = "/(room)/index" as Href;
+const ROOM_HOME = "/(room)" as Href;
 
 export default function AppIndex() {
   const { hasCompletedProfile, isLoading, user } = useSession();
@@ -15,8 +15,8 @@ export default function AppIndex() {
   }
   if (!user) return <Redirect href="/(auth)/sign-in" />;
   if (!hasCompletedProfile) return <Redirect href="/profile-setup" />;
-  // A bare tab group opens its first tab (Chores). Route to the group's index
-  // screen explicitly so returning members always open their Nest home page.
+  // The room layout sets Nest home as its initial tab, so this valid group
+  // route returns a signed-in member to the home screen.
   return <Redirect href={room ? ROOM_HOME : "/create-join"} />;
 }
 

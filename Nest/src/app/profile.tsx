@@ -9,7 +9,7 @@ import { confirmAction } from "@/lib/confirmAction";
 
 // Typed as Href because the generated route types don't always include the
 // bare (room) group-index path.
-const ROOM_HOME = "/(room)/index" as Href;
+const ROOM_HOME = "/(room)" as Href;
 
 export default function ProfileScreen() {
   const { updateProfile, user, signOut } = useSession();

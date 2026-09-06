@@ -4,6 +4,10 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useRoom } from "@/features/rooms/RoomProvider";
 const tabOptions = (title: string) => ({ title, tabBarLabel: title, tabBarActiveTintColor: "#28634E", tabBarInactiveTintColor: "#758079" });
 
+export const unstable_settings = {
+  initialRouteName: "index",
+};
+
 export default function RoomLayout() {
   const { error, loading, room, user } = useRoom();
 
